@@ -1,0 +1,45 @@
+# Build artifacts
+*.o
+*.obj
+*.out
+*.exe
+*.a
+*.so
+*.dylib
+
+# Linker and compiler temporary files
+*.d
+*.lo
+*.la
+
+# Executables
+shell
+shell.o
+main
+
+# Core dumps
+core
+core.*
+
+# Debug files
+*.dSYM/
+*.dbg
+
+# Editor temporary files
+*~
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Backup files
+*.orig
+
+# User-specific files
+dev/
