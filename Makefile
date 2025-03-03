@@ -11,19 +11,27 @@ BUILD_DIR := build
 BIN_DIR := $(BUILD_DIR)/bin
 OBJ_DIR := $(BUILD_DIR)/obj
 TARGET := $(BIN_DIR)/$(PROJECT)
+ENTRYPOINT := $(SRC_DIR)/main.c
 
 SRCS := $(sort $(shell find $(SRC_DIR) -type f -name '*.c' 2>/dev/null))
 OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 DEPS := $(OBJS:.o=.d)
+HAS_ENTRYPOINT := $(strip $(wildcard $(ENTRYPOINT)))
 
-.PHONY: all layout clean fclean re run help
+.PHONY: all objects layout clean fclean re run help
 
 # Allow `make` to succeed before the first translation unit exists.
 ifeq ($(strip $(SRCS)),)
 all: layout
 	@printf "project skeleton is ready. add C sources under %s to build %s.\n" "$(SRC_DIR)" "$(TARGET)"
+else ifeq ($(HAS_ENTRYPOINT),)
+all: objects
+	@printf "compiled support objects in %s. add %s to link %s.\n" "$(OBJ_DIR)" "$(ENTRYPOINT)" "$(TARGET)"
 else
 all: $(TARGET)
+endif
+
+objects: $(OBJS)
 
 $(TARGET): $(OBJS) | $(BIN_DIR)
 	$(CC) $(OBJS) $(LDFLAGS) $(LDLIBS) -o $@
@@ -31,9 +39,6 @@ $(TARGET): $(OBJS) | $(BIN_DIR)
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
--include $(DEPS)
-endif
 
 layout: $(BIN_DIR) $(OBJ_DIR)
 
@@ -49,11 +54,13 @@ fclean:
 re: fclean all
 
 run: all
-ifneq ($(strip $(SRCS)),)
+ifneq ($(HAS_ENTRYPOINT),)
 	@./$(TARGET)
 else
-	@printf "no executable yet. add C sources under %s first.\n" "$(SRC_DIR)"
+	@printf "no executable yet. add %s first.\n" "$(ENTRYPOINT)"
 endif
 
 help:
-	@printf "available targets: all layout clean fclean re run help\n"
+	@printf "available targets: all objects layout clean fclean re run help\n"
+
+-include $(DEPS)
