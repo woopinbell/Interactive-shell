@@ -1,5 +1,5 @@
-#ifndef SHELL_ALLOC_H
-#define SHELL_ALLOC_H
+#ifndef SHELL_SUPPORT_ALLOC_H
+#define SHELL_SUPPORT_ALLOC_H
 
 #include <stddef.h>
 
