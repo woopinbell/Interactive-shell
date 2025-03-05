@@ -24,9 +24,9 @@ make re     # 빌드 디렉터리를 다시 준비합니다.
 ## 초기 디렉터리 구조
 
 ```text
-include/shell/support/ 공통 메모리/버퍼 helper 헤더
+include/shell/support/ 공통 메모리/버퍼/vector helper 헤더
 include/shell/         나머지 공개 헤더
-src/support/       메모리 할당과 문자열 버퍼 같은 공통 유틸리티
+src/support/       메모리 할당과 문자열 버퍼/vector 같은 공통 유틸리티
 src/core/          REPL과 셸 컨텍스트
 src/parse/         토큰화와 파싱
 src/exec/          실행기와 리디렉션
