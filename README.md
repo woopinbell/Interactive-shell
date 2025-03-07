@@ -6,13 +6,13 @@ Interactive Shell을 설계하고 구현하는 C 프로젝트입니다.
 
 ```sh
 make        # 공통 오브젝트를 빌드하고, src/main.c가 있으면 바이너리까지 링크합니다.
-make objects # 공통 helper 오브젝트만 빌드합니다.
+make objects # 현재 누적된 공통/코어 오브젝트만 빌드합니다.
 make clean  # 오브젝트 파일을 정리합니다.
 make fclean # build/ 디렉터리를 전체 정리합니다.
 make re     # 빌드 디렉터리를 다시 준비합니다.
 ```
 
-현재는 support helper를 먼저 추가하는 단계라서, `src/main.c`가 생기기 전까지는 `make`가 오브젝트 파일만 빌드하고 링크는 건너뜁니다.
+현재는 엔트리포인트보다 공통 모듈을 먼저 추가하는 단계라서, `src/main.c`가 생기기 전까지는 `make`가 오브젝트 파일만 빌드하고 링크는 건너뜁니다.
 
 ## 프로젝트 목표
 
@@ -27,7 +27,7 @@ make re     # 빌드 디렉터리를 다시 준비합니다.
 include/shell/support/ 공통 메모리/버퍼/vector/검증 helper 헤더
 include/shell/         나머지 공개 헤더
 src/support/       메모리 할당, 버퍼, vector, 검증 같은 공통 유틸리티
-src/core/          REPL과 셸 컨텍스트
+src/core/          REPL, 셸 컨텍스트, 환경 저장소
 src/parse/         토큰화와 파싱
 src/exec/          실행기와 리디렉션
 src/builtin/       내장 명령어

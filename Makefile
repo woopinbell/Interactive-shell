@@ -26,7 +26,7 @@ all: layout
 	@printf "project skeleton is ready. add C sources under %s to build %s.\n" "$(SRC_DIR)" "$(TARGET)"
 else ifeq ($(HAS_ENTRYPOINT),)
 all: objects
-	@printf "compiled support objects in %s. add %s to link %s.\n" "$(OBJ_DIR)" "$(ENTRYPOINT)" "$(TARGET)"
+	@printf "compiled project objects in %s. add %s to link %s.\n" "$(OBJ_DIR)" "$(ENTRYPOINT)" "$(TARGET)"
 else
 all: $(TARGET)
 endif
