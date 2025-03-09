@@ -29,6 +29,8 @@ int			sh_env_store_has(t_env_store *store, const char *key);
 t_env_node	*sh_env_store_set(t_env_store *store, const char *key,
 				const char *value, int has_value);
 int			sh_env_store_unset(t_env_store *store, const char *key);
+char		**sh_env_store_to_envp(const t_env_store *store);
+char		**sh_env_store_format_export(const t_env_store *store);
 void		sh_env_store_destroy(t_env_store *store);
 
 #endif

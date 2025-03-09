@@ -1,6 +1,8 @@
 #include "shell/env.h"
 
 #include "shell/support/alloc.h"
+#include "shell/support/strbuf.h"
+#include "shell/support/strvec.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -51,6 +53,84 @@ static void	sh_env_store_load_entry(t_env_store *store, const char *entry)
 	key = sh_env_dup_range(entry, (size_t)(equal_sign - entry));
 	sh_env_store_append(store, sh_env_node_new(key, equal_sign + 1, 1));
 	free(key);
+}
+
+static char	*sh_env_store_join_pair(const char *key, const char *value)
+{
+	t_strbuf	buf;
+	char		*joined;
+
+	sh_strbuf_init(&buf);
+	sh_strbuf_append(&buf, key);
+	sh_strbuf_push_char(&buf, '=');
+	sh_strbuf_append(&buf, value);
+	joined = sh_strbuf_take(&buf);
+	sh_strbuf_free(&buf);
+	return (joined);
+}
+
+static void	sh_env_store_append_escaped_value(t_strbuf *buf, const char *value)
+{
+	size_t	index;
+
+	index = 0;
+	while (value[index] != '\0')
+	{
+		if (value[index] == '\\' || value[index] == '"'
+			|| value[index] == '$' || value[index] == '`')
+			sh_strbuf_push_char(buf, '\\');
+		sh_strbuf_push_char(buf, value[index]);
+		index++;
+	}
+}
+
+static char	*sh_env_store_format_export_node(const t_env_node *node)
+{
+	t_strbuf	buf;
+	char		*formatted;
+
+	sh_strbuf_init(&buf);
+	sh_strbuf_append(&buf, "declare -x ");
+	sh_strbuf_append(&buf, node->key);
+	if (node->has_value)
+	{
+		sh_strbuf_append(&buf, "=\"");
+		sh_env_store_append_escaped_value(&buf, node->value);
+		sh_strbuf_push_char(&buf, '"');
+	}
+	formatted = sh_strbuf_take(&buf);
+	sh_strbuf_free(&buf);
+	return (formatted);
+}
+
+static int	sh_env_node_key_compare(const void *left, const void *right)
+{
+	const t_env_node *const	*node_left;
+	const t_env_node *const	*node_right;
+
+	node_left = left;
+	node_right = right;
+	return (strcmp((*node_left)->key, (*node_right)->key));
+}
+
+static t_env_node	**sh_env_store_sorted_nodes(const t_env_store *store)
+{
+	t_env_node	**nodes;
+	t_env_node	*current;
+	size_t		index;
+
+	nodes = sh_xcalloc(store->size, sizeof(t_env_node *));
+	current = store->head;
+	index = 0;
+	while (current != NULL)
+	{
+		nodes[index] = current;
+		current = current->next;
+		index++;
+	}
+	if (store->size > 1)
+		qsort(nodes, store->size, sizeof(t_env_node *), sh_env_node_key_compare);
+	return (nodes);
 }
 
 t_env_node	*sh_env_node_new(const char *key, const char *value, int has_value)
@@ -177,6 +257,54 @@ int	sh_env_store_unset(t_env_store *store, const char *key)
 		node = node->next;
 	}
 	return (0);
+}
+
+char	**sh_env_store_to_envp(const t_env_store *store)
+{
+	t_strvec	entries;
+	t_env_node	*node;
+	char		*entry;
+	char		**serialized;
+
+	sh_strvec_init(&entries);
+	node = store->head;
+	while (node != NULL)
+	{
+		if (node->has_value)
+		{
+			entry = sh_env_store_join_pair(node->key, node->value);
+			sh_strvec_push(&entries, entry);
+			free(entry);
+		}
+		node = node->next;
+	}
+	serialized = sh_strvec_take(&entries);
+	sh_strvec_destroy(&entries);
+	return (serialized);
+}
+
+char	**sh_env_store_format_export(const t_env_store *store)
+{
+	t_strvec	entries;
+	t_env_node	**nodes;
+	char		*line;
+	char		**formatted;
+	size_t		index;
+
+	sh_strvec_init(&entries);
+	nodes = sh_env_store_sorted_nodes(store);
+	index = 0;
+	while (index < store->size)
+	{
+		line = sh_env_store_format_export_node(nodes[index]);
+		sh_strvec_push(&entries, line);
+		free(line);
+		index++;
+	}
+	free(nodes);
+	formatted = sh_strvec_take(&entries);
+	sh_strvec_destroy(&entries);
+	return (formatted);
 }
 
 void	sh_env_store_destroy(t_env_store *store)

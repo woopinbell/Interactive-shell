@@ -58,17 +58,24 @@ char	**sh_strvec_take(t_strvec *vec)
 	return (taken);
 }
 
-void	sh_strvec_destroy(t_strvec *vec)
+void	sh_strtab_destroy(char **items)
 {
 	size_t	index;
 
+	if (items == NULL)
+		return ;
 	index = 0;
-	while (index < vec->len)
+	while (items[index] != NULL)
 	{
-		free(vec->data[index]);
+		free(items[index]);
 		index++;
 	}
-	free(vec->data);
+	free(items);
+}
+
+void	sh_strvec_destroy(t_strvec *vec)
+{
+	sh_strtab_destroy(vec->data);
 	vec->data = NULL;
 	vec->len = 0;
 	vec->capacity = 0;
