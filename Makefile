@@ -4,7 +4,7 @@ CC := cc
 CFLAGS := -Wall -Wextra -Werror
 CPPFLAGS := -Iinclude -MMD -MP
 LDFLAGS :=
-LDLIBS :=
+LDLIBS := -lreadline
 
 SRC_DIR := src
 BUILD_DIR := build

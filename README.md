@@ -5,20 +5,23 @@ Interactive Shell을 설계하고 구현하는 C 프로젝트입니다.
 ## 기본 빌드 뼈대
 
 ```sh
-make        # 공통 오브젝트를 빌드하고, src/main.c가 있으면 바이너리까지 링크합니다.
+make        # 현재 구현된 셸 바이너리까지 빌드합니다.
 make objects # 현재 누적된 공통/코어 오브젝트만 빌드합니다.
 make clean  # 오브젝트 파일을 정리합니다.
 make fclean # build/ 디렉터리를 전체 정리합니다.
 make re     # 빌드 디렉터리를 다시 준비합니다.
+make run    # 최소 REPL을 실행합니다.
 ```
 
-현재는 엔트리포인트보다 공통 모듈을 먼저 추가하는 단계라서, `src/main.c`가 생기기 전까지는 `make`가 오브젝트 파일만 빌드하고 링크는 건너뜁니다.
+현재는 입력 계층과 셸 컨텍스트를 연결한 최소 REPL 단계입니다.
+interactive 모드에서는 `readline`으로 프롬프트 입력을 받고, non-interactive 모드에서는 stdin 스트림을 같은 인터페이스로 읽습니다.
 
 ## 프로젝트 목표
 
 - 기본 빌드 환경 구성
 - 최소 유틸리티와 자려구조 준비
 - 입력 루프와 상태 관리 추가
+- interactive / non-interactive 입력 어댑터 연결
 - 토큰화, 파싱, 실행 흐름 구현
 
 ## 초기 디렉터리 구조
