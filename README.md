@@ -15,6 +15,7 @@ make run    # 최소 REPL을 실행합니다.
 
 현재는 `main`에서 셸 컨텍스트와 입력 어댑터를 묶는 최소 REPL 단계입니다.
 interactive 모드에서는 `readline`으로 프롬프트 입력을 받고, non-interactive 모드에서는 stdin 스트림을 같은 인터페이스로 읽으며 라인 단위 루프를 돕니다.
+프롬프트 대기 중 `SIGINT`는 현재 입력을 취소하고 새 프롬프트로 돌아가며 `SIGQUIT`은 무시합니다.
 
 ## 프로젝트 목표
 

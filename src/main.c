@@ -1,4 +1,5 @@
 #include "shell/shell.h"
+#include "shell/signal.h"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -24,16 +25,24 @@ static int	sh_main_repl(t_shell *shell)
 {
 	char	*line;
 
-	shell->signal_phase = SH_SIGNAL_PHASE_PROMPT;
-	line = sh_input_adapter_read_line(&shell->input, sh_main_prompt(shell));
-	while (line != NULL)
+	line = NULL;
+	while (1)
 	{
+		shell->signal_phase = SH_SIGNAL_PHASE_PROMPT;
+		sh_signal_prompt_enter(shell);
+		line = sh_input_adapter_read_line(&shell->input, sh_main_prompt(shell));
+		sh_signal_prompt_leave(shell);
+		if (sh_signal_prompt_interrupted(shell))
+		{
+			free(line);
+			line = NULL;
+			continue ;
+		}
+		if (line == NULL)
+			break ;
 		if (shell->is_interactive && line[0] != '\0')
 			add_history(line);
 		free(line);
-		shell->signal_phase = SH_SIGNAL_PHASE_PROMPT;
-		line = sh_input_adapter_read_line(&shell->input,
-				sh_main_prompt(shell));
 	}
 	shell->signal_phase = SH_SIGNAL_PHASE_INIT;
 	if (shell->is_interactive)

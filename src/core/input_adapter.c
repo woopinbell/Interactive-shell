@@ -1,11 +1,23 @@
 #include "shell/input.h"
+#include "shell/signal.h"
 
+#include "shell/support/alloc.h"
+
+#include <errno.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/select.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <readline/readline.h>
+
+typedef struct s_readline_context
+{
+	char	*line;
+	int		done;
+}	t_readline_context;
 
 static char	*sh_input_stream_read_line(void *context, const char *prompt)
 {
@@ -33,10 +45,57 @@ static char	*sh_input_stream_read_line(void *context, const char *prompt)
 	return (line);
 }
 
+static t_readline_context	*g_readline_context = NULL;
+
+static void	sh_input_readline_handle_line(char *line)
+{
+	if (g_readline_context == NULL)
+	{
+		free(line);
+		return ;
+	}
+	g_readline_context->line = line;
+	g_readline_context->done = 1;
+}
+
+static void	sh_input_readline_destroy(void *context)
+{
+	free(context);
+}
+
 static char	*sh_input_readline_read_line(void *context, const char *prompt)
 {
-	(void)context;
-	return (readline(prompt));
+	t_readline_context	*readline_context;
+	fd_set				readfds;
+	int					ready;
+
+	readline_context = context;
+	readline_context->line = NULL;
+	readline_context->done = 0;
+	g_readline_context = readline_context;
+	rl_callback_handler_install(prompt, sh_input_readline_handle_line);
+	sh_signal_prompt_refresh();
+	while (!readline_context->done)
+	{
+		FD_ZERO(&readfds);
+		FD_SET(STDIN_FILENO, &readfds);
+		ready = select(STDIN_FILENO + 1, &readfds, NULL, NULL, NULL);
+		if (ready > 0 && FD_ISSET(STDIN_FILENO, &readfds))
+			rl_callback_read_char();
+		else if (ready < 0 && errno == EINTR)
+			break ;
+		else if (ready < 0)
+		{
+			rl_callback_handler_remove();
+			g_readline_context = NULL;
+			return (NULL);
+		}
+	}
+	if (!readline_context->done)
+		rl_free_line_state();
+	rl_callback_handler_remove();
+	g_readline_context = NULL;
+	return (readline_context->line);
 }
 
 void	sh_input_adapter_init(t_input_adapter *adapter)
@@ -66,8 +125,11 @@ void	sh_input_adapter_use_stream(t_input_adapter *adapter)
 
 void	sh_input_adapter_use_readline(t_input_adapter *adapter)
 {
+	t_readline_context	*context;
+
+	context = sh_xcalloc(1, sizeof(t_readline_context));
 	sh_input_adapter_set(adapter, SH_INPUT_ADAPTER_READLINE,
-		NULL, sh_input_readline_read_line, NULL);
+		context, sh_input_readline_read_line, sh_input_readline_destroy);
 }
 
 char	*sh_input_adapter_read_line(t_input_adapter *adapter, const char *prompt)
