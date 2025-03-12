@@ -22,7 +22,6 @@ typedef struct s_shell
 }	t_shell;
 
 void	sh_shell_init(t_shell *shell, char **envp);
-int		sh_shell_run(t_shell *shell);
 void	sh_shell_destroy(t_shell *shell);
 
 #endif

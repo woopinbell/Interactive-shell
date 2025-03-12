@@ -13,8 +13,8 @@ make re     # 빌드 디렉터리를 다시 준비합니다.
 make run    # 최소 REPL을 실행합니다.
 ```
 
-현재는 입력 계층과 셸 컨텍스트를 연결한 최소 REPL 단계입니다.
-interactive 모드에서는 `readline`으로 프롬프트 입력을 받고, non-interactive 모드에서는 stdin 스트림을 같은 인터페이스로 읽습니다.
+현재는 `main`에서 셸 컨텍스트와 입력 어댑터를 묶는 최소 REPL 단계입니다.
+interactive 모드에서는 `readline`으로 프롬프트 입력을 받고, non-interactive 모드에서는 stdin 스트림을 같은 인터페이스로 읽으며 라인 단위 루프를 돕니다.
 
 ## 프로젝트 목표
 
