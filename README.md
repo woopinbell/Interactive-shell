@@ -16,6 +16,7 @@ make run    # 최소 REPL을 실행합니다.
 현재는 `main`에서 셸 컨텍스트와 입력 어댑터를 묶는 최소 REPL 단계입니다.
 interactive 모드에서는 `readline`으로 프롬프트 입력을 받고, non-interactive 모드에서는 stdin 스트림을 같은 인터페이스로 읽으며 라인 단위 루프를 돕니다.
 프롬프트 대기 중 `SIGINT`는 현재 입력을 취소하고 새 프롬프트로 돌아가며 `SIGQUIT`은 무시합니다.
+파싱 단계로 넘어가기 전에 lexer가 공통으로 사용할 토큰 kind와 quote 상태 타입을 먼저 고정합니다.
 
 ## 프로젝트 목표
 
@@ -23,6 +24,7 @@ interactive 모드에서는 `readline`으로 프롬프트 입력을 받고, non-
 - 최소 유틸리티와 자려구조 준비
 - 입력 루프와 상태 관리 추가
 - interactive / non-interactive 입력 어댑터 연결
+- 토큰 종류와 quote 상태 타입 정의
 - 토큰화, 파싱, 실행 흐름 구현
 
 ## 초기 디렉터리 구조
