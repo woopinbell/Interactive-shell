@@ -1,6 +1,8 @@
 #ifndef SHELL_LEXER_H
 #define SHELL_LEXER_H
 
+#include <stddef.h>
+
 typedef enum e_token_kind
 {
 	SH_TOKEN_WORD,
@@ -34,5 +36,18 @@ typedef struct s_token
 	char					*lexeme;
 	t_lexer_quote_state		quote_state;
 }	t_token;
+
+typedef struct s_token_list
+{
+	t_token	*items;
+	size_t	len;
+	size_t	capacity;
+}	t_token_list;
+
+void		sh_token_destroy(t_token *token);
+void		sh_token_list_init(t_token_list *list);
+void		sh_token_list_destroy(t_token_list *list);
+void		sh_lex_line(t_token_list *list, const char *input);
+const char	*sh_token_kind_name(t_token_kind kind);
 
 #endif
