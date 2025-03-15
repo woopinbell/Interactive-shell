@@ -30,11 +30,25 @@ typedef struct s_lexer_quote_state
 	int					is_closed;
 }	t_lexer_quote_state;
 
+typedef struct s_word_part
+{
+	char				*text;
+	t_lexer_quote_state	quote_state;
+}	t_word_part;
+
+typedef struct s_word_part_list
+{
+	t_word_part	*items;
+	size_t		len;
+	size_t		capacity;
+}	t_word_part_list;
+
 typedef struct s_token
 {
 	t_token_kind			kind;
 	char					*lexeme;
 	t_lexer_quote_state		quote_state;
+	t_word_part_list		parts;
 }	t_token;
 
 typedef struct s_token_list
@@ -44,6 +58,7 @@ typedef struct s_token_list
 	size_t	capacity;
 }	t_token_list;
 
+void		sh_word_part_destroy(t_word_part *part);
 void		sh_token_destroy(t_token *token);
 void		sh_token_list_init(t_token_list *list);
 void		sh_token_list_destroy(t_token_list *list);
