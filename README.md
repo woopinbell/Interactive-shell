@@ -19,6 +19,7 @@ interactive 모드에서는 `readline`으로 프롬프트 입력을 받고, non-
 파싱 단계로 넘어가기 전에 lexer가 공통으로 사용할 토큰 kind와 quote 상태 타입을 먼저 고정합니다.
 현재 lexer는 공백 분리, `&&`, `||`, `;`, `|`, `<`, `>`, `<<`, `>>` 연산자 토큰화와 일반 단어 수집까지 지원합니다.
 quoted/plain 인접 조각은 하나의 logical word로 조립되고 각 part는 plain, single, double 상태를 따로 보존합니다.
+`$VAR`, `$?`, parameter 식별자 스캔과 lookup helper도 분리해 다음 확장 단계의 기반을 준비합니다.
 
 ## 프로젝트 목표
 
@@ -29,6 +30,7 @@ quoted/plain 인접 조각은 하나의 logical word로 조립되고 각 part는
 - 토큰 종류와 quote 상태 타입 정의
 - 셸 연산자와 일반 단어 lexer 구현
 - quoted 인접 word part 조립
+- parameter expansion helper 분리
 - 토큰화, 파싱, 실행 흐름 구현
 
 ## 초기 디렉터리 구조

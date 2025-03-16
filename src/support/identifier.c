@@ -26,6 +26,19 @@ size_t	sh_identifier_key_len(const char *text)
 	return (index);
 }
 
+size_t	sh_parameter_identifier_len(const char *text)
+{
+	size_t	index;
+
+	if (text == NULL || !sh_is_identifier_start((unsigned char)text[0]))
+		return (0);
+	index = 1;
+	while (text[index] != '\0'
+		&& sh_is_identifier_char((unsigned char)text[index]))
+		index++;
+	return (index);
+}
+
 int	sh_is_identifier(const char *text)
 {
 	size_t	length;
