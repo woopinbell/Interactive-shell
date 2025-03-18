@@ -112,3 +112,130 @@ void	sh_simple_command_destroy(t_simple_command *command)
 	}
 	command->redirections = NULL;
 }
+
+void	sh_pipeline_command_node_init(t_pipeline_command_node *node)
+{
+	sh_simple_command_init(&node->command);
+	node->next = NULL;
+}
+
+void	sh_pipeline_command_node_destroy(t_pipeline_command_node *node)
+{
+	if (node == NULL)
+		return ;
+	sh_simple_command_destroy(&node->command);
+	node->next = NULL;
+}
+
+void	sh_pipeline_init(t_pipeline *pipeline)
+{
+	pipeline->head = NULL;
+	pipeline->tail = NULL;
+	pipeline->size = 0;
+}
+
+void	sh_pipeline_destroy(t_pipeline *pipeline)
+{
+	t_pipeline_command_node	*node;
+	t_pipeline_command_node	*next;
+
+	if (pipeline == NULL)
+		return ;
+	node = pipeline->head;
+	while (node != NULL)
+	{
+		next = node->next;
+		sh_pipeline_command_node_destroy(node);
+		free(node);
+		node = next;
+	}
+	pipeline->head = NULL;
+	pipeline->tail = NULL;
+	pipeline->size = 0;
+}
+
+void	sh_and_or_list_node_init(t_and_or_list_node *node)
+{
+	sh_pipeline_init(&node->pipeline);
+	node->next_operator = SH_AND_OR_OPERATOR_NONE;
+	node->next = NULL;
+}
+
+void	sh_and_or_list_node_destroy(t_and_or_list_node *node)
+{
+	if (node == NULL)
+		return ;
+	sh_pipeline_destroy(&node->pipeline);
+	node->next_operator = SH_AND_OR_OPERATOR_NONE;
+	node->next = NULL;
+}
+
+void	sh_and_or_list_init(t_and_or_list *list)
+{
+	list->head = NULL;
+	list->tail = NULL;
+	list->size = 0;
+}
+
+void	sh_and_or_list_destroy(t_and_or_list *list)
+{
+	t_and_or_list_node	*node;
+	t_and_or_list_node	*next;
+
+	if (list == NULL)
+		return ;
+	node = list->head;
+	while (node != NULL)
+	{
+		next = node->next;
+		sh_and_or_list_node_destroy(node);
+		free(node);
+		node = next;
+	}
+	list->head = NULL;
+	list->tail = NULL;
+	list->size = 0;
+}
+
+void	sh_sequence_list_node_init(t_sequence_list_node *node)
+{
+	sh_and_or_list_init(&node->and_or);
+	node->next_separator = SH_SEQUENCE_SEPARATOR_NONE;
+	node->next = NULL;
+}
+
+void	sh_sequence_list_node_destroy(t_sequence_list_node *node)
+{
+	if (node == NULL)
+		return ;
+	sh_and_or_list_destroy(&node->and_or);
+	node->next_separator = SH_SEQUENCE_SEPARATOR_NONE;
+	node->next = NULL;
+}
+
+void	sh_sequence_list_init(t_sequence_list *list)
+{
+	list->head = NULL;
+	list->tail = NULL;
+	list->size = 0;
+}
+
+void	sh_sequence_list_destroy(t_sequence_list *list)
+{
+	t_sequence_list_node	*node;
+	t_sequence_list_node	*next;
+
+	if (list == NULL)
+		return ;
+	node = list->head;
+	while (node != NULL)
+	{
+		next = node->next;
+		sh_sequence_list_node_destroy(node);
+		free(node);
+		node = next;
+	}
+	list->head = NULL;
+	list->tail = NULL;
+	list->size = 0;
+}
