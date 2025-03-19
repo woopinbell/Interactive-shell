@@ -22,6 +22,7 @@ quoted/plain 인접 조각은 하나의 logical word로 조립되고 각 part는
 `$VAR`, `$?`, parameter 식별자 스캔과 lookup helper도 분리해 다음 확장 단계의 기반을 준비합니다.
 simple command, argv word, redirection, heredoc placeholder를 담는 AST 타입도 parse 계층에 먼저 고정합니다.
 simple command 위에는 pipeline, and/or list, sequence list 계층을 쌓아 `&&`, `||`, `;`를 담는 상위 AST 구조를 준비합니다.
+parser는 먼저 word/redirection을 simple command로 모으고 `>`, `|`, `&&` 뒤 누락 같은 기본 syntax error를 감지합니다.
 
 ## 프로젝트 목표
 
@@ -35,6 +36,7 @@ simple command 위에는 pipeline, and/or list, sequence list 계층을 쌓아 `
 - parameter expansion helper 분리
 - command/redirection AST 타입 정의
 - pipeline/and-or/sequence AST 타입 정의
+- simple command 파싱과 기본 syntax error 처리
 - 토큰화, 파싱, 실행 흐름 구현
 
 ## 초기 디렉터리 구조
