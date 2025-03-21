@@ -140,6 +140,39 @@ static void	sh_parser_append_redirection(t_simple_command *command,
 	tail->next = node;
 }
 
+static void	sh_parser_append_pipeline_node(t_pipeline *pipeline,
+		t_pipeline_command_node *node)
+{
+	if (pipeline->tail == NULL)
+		pipeline->head = node;
+	else
+		pipeline->tail->next = node;
+	pipeline->tail = node;
+	pipeline->size += 1;
+}
+
+static void	sh_parser_append_and_or_node(t_and_or_list *list,
+		t_and_or_list_node *node)
+{
+	if (list->tail == NULL)
+		list->head = node;
+	else
+		list->tail->next = node;
+	list->tail = node;
+	list->size += 1;
+}
+
+static void	sh_parser_append_sequence_node(t_sequence_list *list,
+		t_sequence_list_node *node)
+{
+	if (list->tail == NULL)
+		list->head = node;
+	else
+		list->tail->next = node;
+	list->tail = node;
+	list->size += 1;
+}
+
 static int	sh_parser_parse_redirection(t_parser *parser,
 		t_simple_command *command)
 {
@@ -250,6 +283,104 @@ int	sh_parse_simple_command(t_parser *parser, t_simple_command *command)
 	{
 		sh_parser_set_syntax_error(parser, sh_parser_peek(parser, 1));
 		return (0);
+	}
+	return (!sh_parser_has_error(parser));
+}
+
+int	sh_parse_pipeline(t_parser *parser, t_pipeline *pipeline)
+{
+	t_pipeline_command_node	*node;
+
+	node = sh_xcalloc(1, sizeof(t_pipeline_command_node));
+	sh_pipeline_command_node_init(node);
+	if (!sh_parse_simple_command(parser, &node->command))
+	{
+		free(node);
+		return (0);
+	}
+	sh_parser_append_pipeline_node(pipeline, node);
+	while (sh_parser_current(parser) != NULL
+		&& sh_parser_current(parser)->kind == SH_TOKEN_PIPE)
+	{
+		sh_parser_advance(parser);
+		node = sh_xcalloc(1, sizeof(t_pipeline_command_node));
+		sh_pipeline_command_node_init(node);
+		if (!sh_parse_simple_command(parser, &node->command))
+		{
+			free(node);
+			return (0);
+		}
+		sh_parser_append_pipeline_node(pipeline, node);
+	}
+	return (!sh_parser_has_error(parser));
+}
+
+int	sh_parse_and_or_list(t_parser *parser, t_and_or_list *list)
+{
+	t_and_or_list_node	*node;
+	t_token_kind		kind;
+
+	node = sh_xcalloc(1, sizeof(t_and_or_list_node));
+	sh_and_or_list_node_init(node);
+	if (!sh_parse_pipeline(parser, &node->pipeline))
+	{
+		free(node);
+		return (0);
+	}
+	sh_parser_append_and_or_node(list, node);
+	while (sh_parser_current(parser) != NULL
+		&& (sh_parser_current(parser)->kind == SH_TOKEN_AND_IF
+			|| sh_parser_current(parser)->kind == SH_TOKEN_OR_IF))
+	{
+		kind = sh_parser_current(parser)->kind;
+		if (kind == SH_TOKEN_AND_IF)
+			node->next_operator = SH_AND_OR_OPERATOR_AND_IF;
+		else
+			node->next_operator = SH_AND_OR_OPERATOR_OR_IF;
+		sh_parser_advance(parser);
+		node = sh_xcalloc(1, sizeof(t_and_or_list_node));
+		sh_and_or_list_node_init(node);
+		if (!sh_parse_pipeline(parser, &node->pipeline))
+		{
+			free(node);
+			return (0);
+		}
+		sh_parser_append_and_or_node(list, node);
+	}
+	return (!sh_parser_has_error(parser));
+}
+
+int	sh_parse_sequence_list(t_parser *parser, t_sequence_list *list)
+{
+	t_sequence_list_node	*node;
+
+	if (sh_parser_current(parser) == NULL
+		|| sh_parser_current(parser)->kind == SH_TOKEN_EOF)
+		return (1);
+	node = sh_xcalloc(1, sizeof(t_sequence_list_node));
+	sh_sequence_list_node_init(node);
+	if (!sh_parse_and_or_list(parser, &node->and_or))
+	{
+		free(node);
+		return (0);
+	}
+	sh_parser_append_sequence_node(list, node);
+	while (sh_parser_current(parser) != NULL
+		&& sh_parser_current(parser)->kind == SH_TOKEN_SEMICOLON)
+	{
+		node->next_separator = SH_SEQUENCE_SEPARATOR_SEMICOLON;
+		sh_parser_advance(parser);
+		if (sh_parser_current(parser) == NULL
+			|| sh_parser_current(parser)->kind == SH_TOKEN_EOF)
+			break ;
+		node = sh_xcalloc(1, sizeof(t_sequence_list_node));
+		sh_sequence_list_node_init(node);
+		if (!sh_parse_and_or_list(parser, &node->and_or))
+		{
+			free(node);
+			return (0);
+		}
+		sh_parser_append_sequence_node(list, node);
 	}
 	return (!sh_parser_has_error(parser));
 }

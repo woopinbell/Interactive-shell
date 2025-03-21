@@ -22,5 +22,9 @@ const t_token	*sh_parser_current(const t_parser *parser);
 int				sh_parser_can_start_simple_command(const t_parser *parser);
 int				sh_parse_simple_command(t_parser *parser,
 					t_simple_command *command);
+int				sh_parse_pipeline(t_parser *parser, t_pipeline *pipeline);
+int				sh_parse_and_or_list(t_parser *parser, t_and_or_list *list);
+int				sh_parse_sequence_list(t_parser *parser,
+					t_sequence_list *list);
 
 #endif
