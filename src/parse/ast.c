@@ -43,6 +43,7 @@ void	sh_command_word_destroy(t_command_word *word)
 
 void	sh_heredoc_placeholder_init(t_heredoc_placeholder *placeholder)
 {
+	placeholder->delimiter = NULL;
 	placeholder->should_expand = 0;
 	placeholder->fd = -1;
 	placeholder->path = NULL;
@@ -52,6 +53,8 @@ void	sh_heredoc_placeholder_destroy(t_heredoc_placeholder *placeholder)
 {
 	if (placeholder == NULL)
 		return ;
+	free(placeholder->delimiter);
+	placeholder->delimiter = NULL;
 	free(placeholder->path);
 	placeholder->path = NULL;
 	placeholder->fd = -1;

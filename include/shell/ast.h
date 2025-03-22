@@ -23,6 +23,7 @@ typedef enum e_redirection_kind
 
 typedef struct s_heredoc_placeholder
 {
+	char	*delimiter;
 	int		should_expand;
 	int		fd;
 	char	*path;

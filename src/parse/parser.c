@@ -124,6 +124,29 @@ static t_redirection_kind	sh_parser_redirection_kind(t_token_kind kind)
 	return (SH_REDIRECTION_NONE);
 }
 
+static int	sh_parser_word_has_quoted_part(const t_command_word *word)
+{
+	size_t	index;
+
+	index = 0;
+	while (index < word->parts.len)
+	{
+		if (word->parts.items[index].quote_state.kind != SH_QUOTE_STATE_NONE)
+			return (1);
+		index++;
+	}
+	return (0);
+}
+
+static void	sh_parser_fill_heredoc_metadata(t_redirection_node *node)
+{
+	if (node->kind != SH_REDIRECTION_HEREDOC)
+		return ;
+	if (node->operand.text != NULL)
+		node->heredoc.delimiter = sh_xstrdup(node->operand.text);
+	node->heredoc.should_expand = !sh_parser_word_has_quoted_part(&node->operand);
+}
+
 static void	sh_parser_append_redirection(t_simple_command *command,
 		t_redirection_node *node)
 {
@@ -192,6 +215,7 @@ static int	sh_parser_parse_redirection(t_parser *parser,
 	sh_redirection_node_init(node);
 	node->kind = sh_parser_redirection_kind(token_kind);
 	sh_parser_copy_command_word(&node->operand, operand);
+	sh_parser_fill_heredoc_metadata(node);
 	sh_parser_append_redirection(command, node);
 	sh_parser_advance(parser);
 	return (1);
