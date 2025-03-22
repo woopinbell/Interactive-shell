@@ -25,6 +25,7 @@ simple command 위에는 pipeline, and/or list, sequence list 계층을 쌓아 `
 parser는 먼저 word/redirection을 simple command로 모으고 `>`, `|`, `&&` 뒤 누락 같은 기본 syntax error를 감지합니다.
 이후 parser는 simple command -> pipeline -> and/or -> sequence 순서로 연산자 우선순위를 반영해 상위 AST를 조립합니다.
 heredoc redirection은 delimiter 문자열과 quoted delimiter 규칙에 따른 확장 허용 여부를 AST에 함께 기록합니다.
+parsed word의 expansion은 lexing이 아니라 실행 전 word preparation 단계에서 수행하며 single quote part는 확장을 막습니다.
 
 ## 프로젝트 목표
 
@@ -41,6 +42,7 @@ heredoc redirection은 delimiter 문자열과 quoted delimiter 규칙에 따른 
 - simple command 파싱과 기본 syntax error 처리
 - pipeline/and-or/sequence precedence 파싱
 - heredoc delimiter metadata 기록
+- parsed word preparation expansion
 - 토큰화, 파싱, 실행 흐름 구현
 
 ## 초기 디렉터리 구조
