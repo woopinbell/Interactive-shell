@@ -12,5 +12,10 @@ int		sh_prepare_simple_command_words(t_shell *shell,
 int		sh_prepare_pipeline_words(t_shell *shell, t_pipeline *pipeline);
 int		sh_prepare_and_or_list_words(t_shell *shell, t_and_or_list *list);
 int		sh_prepare_sequence_words(t_shell *shell, t_sequence_list *list);
+int		sh_prepare_simple_command_heredocs(t_shell *shell,
+			t_simple_command *command);
+int		sh_prepare_pipeline_heredocs(t_shell *shell, t_pipeline *pipeline);
+int		sh_prepare_and_or_list_heredocs(t_shell *shell, t_and_or_list *list);
+int		sh_prepare_sequence_heredocs(t_shell *shell, t_sequence_list *list);
 
 #endif

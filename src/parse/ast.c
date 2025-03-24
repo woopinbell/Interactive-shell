@@ -1,6 +1,7 @@
 #include "shell/ast.h"
 
 #include <stdlib.h>
+#include <unistd.h>
 
 static t_lexer_quote_state	sh_ast_plain_quote_state(void)
 {
@@ -53,11 +54,17 @@ void	sh_heredoc_placeholder_destroy(t_heredoc_placeholder *placeholder)
 {
 	if (placeholder == NULL)
 		return ;
+	if (placeholder->fd >= 0)
+	{
+		close(placeholder->fd);
+		placeholder->fd = -1;
+	}
+	if (placeholder->path != NULL)
+		unlink(placeholder->path);
 	free(placeholder->delimiter);
 	placeholder->delimiter = NULL;
 	free(placeholder->path);
 	placeholder->path = NULL;
-	placeholder->fd = -1;
 	placeholder->should_expand = 0;
 }
 
