@@ -1,6 +1,9 @@
+#include "shell/exec.h"
+#include "shell/parser.h"
 #include "shell/shell.h"
 #include "shell/signal.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -19,6 +22,38 @@ static void	sh_main_select_input_adapter(t_shell *shell)
 		sh_input_adapter_use_readline(&shell->input);
 	else
 		sh_input_adapter_use_stream(&shell->input);
+}
+
+static void	sh_main_report_syntax_error(const t_parser *parser)
+{
+	const char	*token;
+
+	token = sh_parser_error_token_text(parser);
+	if (token == NULL)
+		token = "newline";
+	fprintf(stderr, "shell: %s `%s'\n",
+		sh_parser_error_message(parser), token);
+}
+
+static void	sh_main_handle_line(t_shell *shell, const char *line)
+{
+	t_token_list		tokens;
+	t_parser			parser;
+	t_sequence_list	list;
+
+	sh_token_list_init(&tokens);
+	sh_sequence_list_init(&list);
+	sh_lex_line(&tokens, line);
+	sh_parser_init(&parser, &tokens);
+	if (!sh_parse_sequence_list(&parser, &list))
+	{
+		sh_main_report_syntax_error(&parser);
+		shell->last_status = 2;
+	}
+	else
+		sh_executor_run(shell, &list);
+	sh_sequence_list_destroy(&list);
+	sh_token_list_destroy(&tokens);
 }
 
 static int	sh_main_repl(t_shell *shell)
@@ -42,6 +77,7 @@ static int	sh_main_repl(t_shell *shell)
 			break ;
 		if (shell->is_interactive && line[0] != '\0')
 			add_history(line);
+		sh_main_handle_line(shell, line);
 		free(line);
 	}
 	shell->signal_phase = SH_SIGNAL_PHASE_INIT;
