@@ -1,3 +1,4 @@
+#include "shell/builtin.h"
 #include "shell/exec.h"
 
 #include "shell/prepare.h"
@@ -71,32 +72,42 @@ static int	sh_executor_wait_child(pid_t child_pid)
 	return (sh_executor_status_from_waitpid(wait_status));
 }
 
-static int	sh_executor_run_external_command(t_shell *shell,
-		t_simple_command *command)
+static int	sh_executor_run_external_command(t_shell *shell, char **argv)
 {
 	pid_t	child_pid;
-	char	**argv;
 	char	**envp;
 	int		status;
 
-	if (command->argc == 0)
-		return (0);
-	argv = sh_executor_command_argv(command);
 	envp = sh_env_store_to_envp(&shell->env);
 	child_pid = fork();
 	if (child_pid < 0)
 	{
 		status = sh_executor_status_from_system_error(errno);
-		sh_perror(command->argv[0].text, "fork");
+		sh_perror(argv[0], "fork");
 		sh_executor_free_vector(envp);
-		sh_executor_free_vector(argv);
 		return (status);
 	}
 	if (child_pid == 0)
 		sh_executor_child_exec(shell, argv, envp);
 	sh_executor_free_vector(envp);
-	sh_executor_free_vector(argv);
 	return (sh_executor_wait_child(child_pid));
+}
+
+static int	sh_executor_run_simple_command(t_shell *shell,
+		t_simple_command *command)
+{
+	char	**argv;
+	int		handled;
+	int		status;
+
+	if (command->argc == 0)
+		return (0);
+	argv = sh_executor_command_argv(command);
+	status = sh_builtin_dispatch(shell, command->argc, argv, &handled);
+	if (!handled)
+		status = sh_executor_run_external_command(shell, argv);
+	sh_executor_free_vector(argv);
+	return (status);
 }
 
 static int	sh_executor_run_pipeline(t_shell *shell, t_pipeline *pipeline)
@@ -106,7 +117,7 @@ static int	sh_executor_run_pipeline(t_shell *shell, t_pipeline *pipeline)
 		sh_error("pipeline", "not supported yet");
 		return (1);
 	}
-	return (sh_executor_run_external_command(shell, &pipeline->head->command));
+	return (sh_executor_run_simple_command(shell, &pipeline->head->command));
 }
 
 static int	sh_executor_run_and_or_list(t_shell *shell, t_and_or_list *list)
