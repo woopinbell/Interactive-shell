@@ -6,9 +6,17 @@
 #include "shell/support/error.h"
 
 #include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+
+typedef struct s_executor_saved_fds
+{
+	int	stdin_copy;
+	int	stdout_copy;
+}	t_executor_saved_fds;
 
 static void	sh_executor_free_vector(char **values)
 {
@@ -23,6 +31,119 @@ static void	sh_executor_free_vector(char **values)
 		index++;
 	}
 	free(values);
+}
+
+static void	sh_executor_saved_fds_init(t_executor_saved_fds *saved)
+{
+	saved->stdin_copy = -1;
+	saved->stdout_copy = -1;
+}
+
+static void	sh_executor_saved_fds_close(t_executor_saved_fds *saved)
+{
+	if (saved->stdin_copy >= 0)
+		close(saved->stdin_copy);
+	if (saved->stdout_copy >= 0)
+		close(saved->stdout_copy);
+	sh_executor_saved_fds_init(saved);
+}
+
+static int	sh_executor_redirection_target_fd(const t_redirection_node *node)
+{
+	if (node->kind == SH_REDIRECTION_INPUT || node->kind == SH_REDIRECTION_HEREDOC)
+		return (STDIN_FILENO);
+	return (STDOUT_FILENO);
+}
+
+static int	sh_executor_save_target_fd(int target_fd,
+		t_executor_saved_fds *saved)
+{
+	if (saved == NULL)
+		return (0);
+	if (target_fd == STDIN_FILENO && saved->stdin_copy < 0)
+	{
+		saved->stdin_copy = dup(STDIN_FILENO);
+		if (saved->stdin_copy < 0)
+			return (sh_executor_status_from_system_error(errno));
+	}
+	if (target_fd == STDOUT_FILENO && saved->stdout_copy < 0)
+	{
+		saved->stdout_copy = dup(STDOUT_FILENO);
+		if (saved->stdout_copy < 0)
+			return (sh_executor_status_from_system_error(errno));
+	}
+	return (0);
+}
+
+static int	sh_executor_open_redirection_fd(const t_redirection_node *node)
+{
+	if (node->kind == SH_REDIRECTION_INPUT)
+		return (open(node->operand.text, O_RDONLY));
+	if (node->kind == SH_REDIRECTION_OUTPUT)
+		return (open(node->operand.text, O_WRONLY | O_CREAT | O_TRUNC, 0644));
+	if (node->kind == SH_REDIRECTION_APPEND)
+		return (open(node->operand.text, O_WRONLY | O_CREAT | O_APPEND, 0644));
+	if (node->kind == SH_REDIRECTION_HEREDOC)
+		return (node->heredoc.fd);
+	return (-1);
+}
+
+static int	sh_executor_apply_single_redirection(t_redirection_node *node,
+		t_executor_saved_fds *saved)
+{
+	int	target_fd;
+	int	source_fd;
+	int	status;
+
+	target_fd = sh_executor_redirection_target_fd(node);
+	status = sh_executor_save_target_fd(target_fd, saved);
+	if (status != 0)
+		return (status);
+	source_fd = sh_executor_open_redirection_fd(node);
+	if (source_fd < 0)
+	{
+		if (node->kind == SH_REDIRECTION_HEREDOC)
+			sh_error("heredoc", "not prepared");
+		else
+			sh_perror(node->operand.text, NULL);
+		return (sh_executor_status_from_system_error(errno));
+	}
+	if (dup2(source_fd, target_fd) < 0)
+	{
+		if (node->kind != SH_REDIRECTION_HEREDOC)
+			close(source_fd);
+		sh_perror(node->operand.text, NULL);
+		return (sh_executor_status_from_system_error(errno));
+	}
+	if (node->kind != SH_REDIRECTION_HEREDOC)
+		close(source_fd);
+	return (0);
+}
+
+static int	sh_executor_apply_command_redirections(t_simple_command *command,
+		t_executor_saved_fds *saved)
+{
+	t_redirection_node	*node;
+	int					status;
+
+	node = command->redirections;
+	while (node != NULL)
+	{
+		status = sh_executor_apply_single_redirection(node, saved);
+		if (status != 0)
+			return (status);
+		node = node->next;
+	}
+	return (0);
+}
+
+static int	sh_executor_restore_saved_fds(t_executor_saved_fds *saved)
+{
+	if (saved->stdin_copy >= 0 && dup2(saved->stdin_copy, STDIN_FILENO) < 0)
+		return (sh_executor_status_from_system_error(errno));
+	if (saved->stdout_copy >= 0 && dup2(saved->stdout_copy, STDOUT_FILENO) < 0)
+		return (sh_executor_status_from_system_error(errno));
+	return (0);
 }
 
 static char	**sh_executor_command_argv(const t_simple_command *command)
@@ -40,11 +161,58 @@ static char	**sh_executor_command_argv(const t_simple_command *command)
 	return (argv);
 }
 
-static void	sh_executor_child_exec(t_shell *shell, char **argv, char **envp)
+static int	sh_executor_run_builtin_in_parent(t_shell *shell,
+		t_simple_command *command, char **argv, int *handled)
+{
+	t_executor_saved_fds	saved;
+	t_builtin_fn				run;
+	int						status;
+
+	run = sh_builtin_find(argv[0]);
+	if (handled != NULL)
+		*handled = (run != NULL);
+	if (run == NULL)
+		return (0);
+	sh_executor_saved_fds_init(&saved);
+	fflush(NULL);
+	status = sh_executor_apply_command_redirections(command, &saved);
+	if (status == 0)
+		status = run(shell, command->argc, argv);
+	fflush(NULL);
+	if (sh_executor_restore_saved_fds(&saved) != 0 && status == 0)
+		status = sh_executor_status_from_system_error(errno);
+	sh_executor_saved_fds_close(&saved);
+	return (status);
+}
+
+static int	sh_executor_apply_empty_command(t_simple_command *command)
+{
+	t_executor_saved_fds	saved;
+	int						status;
+
+	sh_executor_saved_fds_init(&saved);
+	fflush(NULL);
+	status = sh_executor_apply_command_redirections(command, &saved);
+	fflush(NULL);
+	if (sh_executor_restore_saved_fds(&saved) != 0 && status == 0)
+		status = sh_executor_status_from_system_error(errno);
+	sh_executor_saved_fds_close(&saved);
+	return (status);
+}
+
+static void	sh_executor_child_exec(t_shell *shell, t_simple_command *command,
+		char **argv, char **envp)
 {
 	char	*resolved_path;
 	int		exit_status;
 
+	exit_status = sh_executor_apply_command_redirections(command, NULL);
+	if (exit_status != 0)
+	{
+		sh_executor_free_vector(envp);
+		sh_executor_free_vector(argv);
+		_exit(exit_status);
+	}
 	resolved_path = sh_executor_resolve_command_path(shell, argv[0]);
 	if (resolved_path == NULL)
 	{
@@ -72,7 +240,8 @@ static int	sh_executor_wait_child(pid_t child_pid)
 	return (sh_executor_status_from_waitpid(wait_status));
 }
 
-static int	sh_executor_run_external_command(t_shell *shell, char **argv)
+static int	sh_executor_run_external_command(t_shell *shell,
+		t_simple_command *command, char **argv)
 {
 	pid_t	child_pid;
 	char	**envp;
@@ -88,7 +257,7 @@ static int	sh_executor_run_external_command(t_shell *shell, char **argv)
 		return (status);
 	}
 	if (child_pid == 0)
-		sh_executor_child_exec(shell, argv, envp);
+		sh_executor_child_exec(shell, command, argv, envp);
 	sh_executor_free_vector(envp);
 	return (sh_executor_wait_child(child_pid));
 }
@@ -101,11 +270,11 @@ static int	sh_executor_run_simple_command(t_shell *shell,
 	int		status;
 
 	if (command->argc == 0)
-		return (0);
+		return (sh_executor_apply_empty_command(command));
 	argv = sh_executor_command_argv(command);
-	status = sh_builtin_dispatch(shell, command->argc, argv, &handled);
+	status = sh_executor_run_builtin_in_parent(shell, command, argv, &handled);
 	if (!handled)
-		status = sh_executor_run_external_command(shell, argv);
+		status = sh_executor_run_external_command(shell, command, argv);
 	sh_executor_free_vector(argv);
 	return (status);
 }
