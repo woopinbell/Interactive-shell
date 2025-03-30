@@ -79,6 +79,8 @@ static int	sh_main_repl(t_shell *shell)
 			add_history(line);
 		sh_main_handle_line(shell, line);
 		free(line);
+		if (shell->should_exit)
+			break ;
 	}
 	shell->signal_phase = SH_SIGNAL_PHASE_INIT;
 	if (shell->is_interactive)

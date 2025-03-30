@@ -12,6 +12,7 @@ void	sh_shell_init(t_shell *shell, char **envp)
 	sh_env_store_init_from_envp(&shell->env, envp);
 	shell->last_status = 0;
 	shell->is_interactive = sh_shell_detect_interactive();
+	shell->should_exit = 0;
 	sh_input_adapter_init(&shell->input);
 	shell->signal_phase = SH_SIGNAL_PHASE_INIT;
 }
@@ -22,5 +23,6 @@ void	sh_shell_destroy(t_shell *shell)
 	sh_env_store_destroy(&shell->env);
 	shell->last_status = 0;
 	shell->is_interactive = 0;
+	shell->should_exit = 0;
 	shell->signal_phase = SH_SIGNAL_PHASE_INIT;
 }

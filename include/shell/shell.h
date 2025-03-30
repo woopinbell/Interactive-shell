@@ -17,6 +17,7 @@ typedef struct s_shell
 	t_env_store				env;
 	int						last_status;
 	int						is_interactive;
+	int						should_exit;
 	t_input_adapter			input;
 	t_shell_signal_phase	signal_phase;
 }	t_shell;
