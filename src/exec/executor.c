@@ -200,19 +200,27 @@ static int	sh_executor_apply_empty_command(t_simple_command *command)
 	return (status);
 }
 
-static void	sh_executor_child_exec(t_shell *shell, t_simple_command *command,
-		char **argv, char **envp)
+static void	sh_executor_child_run_command(t_shell *shell,
+		t_simple_command *command)
 {
-	char	*resolved_path;
-	int		exit_status;
+	t_builtin_fn	run;
+	char			**argv;
+	char			**envp;
+	char			*resolved_path;
+	int				exit_status;
 
-	exit_status = sh_executor_apply_command_redirections(command, NULL);
-	if (exit_status != 0)
+	if (command->argc == 0)
+		_exit(0);
+	argv = sh_executor_command_argv(command);
+	run = sh_builtin_find(argv[0]);
+	if (run != NULL)
 	{
-		sh_executor_free_vector(envp);
+		exit_status = run(shell, command->argc, argv);
+		fflush(NULL);
 		sh_executor_free_vector(argv);
 		_exit(exit_status);
 	}
+	envp = sh_env_store_to_envp(&shell->env);
 	resolved_path = sh_executor_resolve_command_path(shell, argv[0]);
 	if (resolved_path == NULL)
 	{
@@ -230,6 +238,25 @@ static void	sh_executor_child_exec(t_shell *shell, t_simple_command *command,
 	_exit(exit_status);
 }
 
+static void	sh_executor_child_run_stage(t_shell *shell, t_simple_command *command,
+		int input_fd, int output_fd)
+{
+	int	exit_status;
+
+	if (input_fd != STDIN_FILENO && dup2(input_fd, STDIN_FILENO) < 0)
+		_exit(sh_executor_status_from_system_error(errno));
+	if (output_fd != STDOUT_FILENO && dup2(output_fd, STDOUT_FILENO) < 0)
+		_exit(sh_executor_status_from_system_error(errno));
+	if (input_fd != STDIN_FILENO)
+		close(input_fd);
+	if (output_fd != STDOUT_FILENO)
+		close(output_fd);
+	exit_status = sh_executor_apply_command_redirections(command, NULL);
+	if (exit_status != 0)
+		_exit(exit_status);
+	sh_executor_child_run_command(shell, command);
+}
+
 static int	sh_executor_wait_child(pid_t child_pid)
 {
 	int	wait_status;
@@ -244,26 +271,22 @@ static int	sh_executor_run_external_command(t_shell *shell,
 		t_simple_command *command, char **argv)
 {
 	pid_t	child_pid;
-	char	**envp;
 	int		status;
 
-	envp = sh_env_store_to_envp(&shell->env);
 	child_pid = fork();
 	if (child_pid < 0)
 	{
 		status = sh_executor_status_from_system_error(errno);
 		sh_perror(argv[0], "fork");
-		sh_executor_free_vector(envp);
 		return (status);
 	}
 	if (child_pid == 0)
-		sh_executor_child_exec(shell, command, argv, envp);
-	sh_executor_free_vector(envp);
+		sh_executor_child_run_stage(shell, command, STDIN_FILENO, STDOUT_FILENO);
 	return (sh_executor_wait_child(child_pid));
 }
 
 static int	sh_executor_run_simple_command(t_shell *shell,
-		t_simple_command *command)
+		t_simple_command *command, int allow_parent_builtin)
 {
 	char	**argv;
 	int		handled;
@@ -272,21 +295,105 @@ static int	sh_executor_run_simple_command(t_shell *shell,
 	if (command->argc == 0)
 		return (sh_executor_apply_empty_command(command));
 	argv = sh_executor_command_argv(command);
-	status = sh_executor_run_builtin_in_parent(shell, command, argv, &handled);
+	handled = 0;
+	status = 0;
+	if (allow_parent_builtin)
+		status = sh_executor_run_builtin_in_parent(shell, command, argv, &handled);
 	if (!handled)
 		status = sh_executor_run_external_command(shell, command, argv);
 	sh_executor_free_vector(argv);
 	return (status);
 }
 
+static int	sh_executor_wait_pipeline_children(pid_t *pids, size_t count)
+{
+	int		wait_status;
+	int		last_status;
+	size_t	index;
+
+	last_status = 0;
+	index = 0;
+	while (index < count)
+	{
+		wait_status = 0;
+		if (waitpid(pids[index], &wait_status, 0) < 0)
+			last_status = sh_executor_status_from_system_error(errno);
+		else if (index == count - 1)
+			last_status = sh_executor_status_from_waitpid(wait_status);
+		index++;
+	}
+	return (last_status);
+}
+
+static pid_t	sh_executor_spawn_pipeline_stage(t_shell *shell,
+		t_simple_command *command, int input_fd, int output_fd)
+{
+	pid_t	child_pid;
+
+	child_pid = fork();
+	if (child_pid < 0)
+		return (-1);
+	if (child_pid == 0)
+		sh_executor_child_run_stage(shell, command, input_fd, output_fd);
+	return (child_pid);
+}
+
+static int	sh_executor_run_pipeline_stages(t_shell *shell, t_pipeline *pipeline)
+{
+	t_pipeline_command_node	*node;
+	pid_t					*pids;
+	size_t					index;
+	int						pipefd[2];
+	int						input_fd;
+
+	pids = sh_xcalloc(pipeline->size, sizeof(pid_t));
+	node = pipeline->head;
+	index = 0;
+	input_fd = STDIN_FILENO;
+	while (node != NULL)
+	{
+		pipefd[0] = -1;
+		pipefd[1] = -1;
+		if (node->next != NULL && pipe(pipefd) < 0)
+			break ;
+		pids[index] = sh_executor_spawn_pipeline_stage(shell, &node->command,
+				input_fd, node->next != NULL ? pipefd[1] : STDOUT_FILENO);
+		if (input_fd != STDIN_FILENO)
+			close(input_fd);
+		if (pipefd[1] >= 0)
+			close(pipefd[1]);
+		if (pids[index] < 0)
+		{
+			if (pipefd[0] >= 0)
+				close(pipefd[0]);
+			break ;
+		}
+		input_fd = pipefd[0];
+		node = node->next;
+		index++;
+	}
+	if (input_fd != STDIN_FILENO && node == NULL)
+		close(input_fd);
+	if (node != NULL)
+	{
+		if (input_fd != STDIN_FILENO)
+			close(input_fd);
+		if (index > 0)
+			sh_executor_wait_pipeline_children(pids, index);
+		free(pids);
+		return (sh_executor_status_from_system_error(errno));
+	}
+	input_fd = sh_executor_wait_pipeline_children(pids, index);
+	free(pids);
+	return (input_fd);
+}
+
 static int	sh_executor_run_pipeline(t_shell *shell, t_pipeline *pipeline)
 {
-	if (pipeline->size != 1)
-	{
-		sh_error("pipeline", "not supported yet");
-		return (1);
-	}
-	return (sh_executor_run_simple_command(shell, &pipeline->head->command));
+	if (pipeline->size == 1)
+		return (sh_executor_run_simple_command(shell,
+				&pipeline->head->command, 1));
+	return (sh_executor_run_pipeline_stages(shell, pipeline));
 }
 
 static int	sh_executor_run_and_or_list(t_shell *shell, t_and_or_list *list)
