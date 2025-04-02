@@ -396,14 +396,37 @@ static int	sh_executor_run_pipeline(t_shell *shell, t_pipeline *pipeline)
 	return (sh_executor_run_pipeline_stages(shell, pipeline));
 }
 
+static int	sh_executor_should_run_and_or(t_and_or_operator operator, int status)
+{
+	if (operator == SH_AND_OR_OPERATOR_AND_IF)
+		return (status == 0);
+	if (operator == SH_AND_OR_OPERATOR_OR_IF)
+		return (status != 0);
+	return (1);
+}
+
 static int	sh_executor_run_and_or_list(t_shell *shell, t_and_or_list *list)
 {
-	if (list->size != 1)
+	t_and_or_list_node	*node;
+	t_and_or_list_node	*next;
+	int					status;
+
+	if (list->head == NULL)
+		return (0);
+	status = sh_executor_run_pipeline(shell, &list->head->pipeline);
+	node = list->head;
+	while (node->next != NULL)
 	{
-		sh_error("and/or", "not supported yet");
-		return (1);
+		next = node->next;
+		if (!sh_executor_should_run_and_or(node->next_operator, status))
+		{
+			node = next;
+			continue ;
+		}
+		status = sh_executor_run_pipeline(shell, &next->pipeline);
+		node = next;
 	}
-	return (sh_executor_run_pipeline(shell, &list->head->pipeline));
+	return (status);
 }
 
 static int	sh_executor_run_sequence_list(t_shell *shell,

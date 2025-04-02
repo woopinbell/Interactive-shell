@@ -34,6 +34,7 @@ builtin registry가 추가되어 echo, pwd, env, true, false 같은 stateless bu
 단일 명령 실행 경로는 <, >, >>, prepared heredoc redirection을 적용하고 standalone builtin 쪽은 fd save/restore로 원래 표준 입출력을 되돌립니다.
 cd, export, unset, exit 같은 parent-state builtin은 단독 명령일 때 부모 프로세스에서 실행되어 shell 상태를 직접 바꾸고 exit는 REPL 종료 플래그를 남깁니다.
 multi-stage pipeline은 각 stage를 child에서 실행하며 pipe fd 체인과 command redirection을 함께 적용하고 마지막 명령의 status를 반환합니다.
+and/or list는 마지막으로 실행된 status를 기준으로 `&&`, `||` short-circuit 규칙을 적용해 필요한 pipeline만 실행합니다.
 
 ## 프로젝트 목표
 
@@ -59,6 +60,7 @@ multi-stage pipeline은 각 stage를 child에서 실행하며 pipe fd 체인과 
 - single command redirection apply
 - parent-state builtins
 - multi-stage pipeline execution
+- and/or short-circuit execution
 - 토큰화, 파싱, 실행 흐름 구현
 
 ## 초기 디렉터리 구조
