@@ -35,6 +35,7 @@ builtin registry가 추가되어 echo, pwd, env, true, false 같은 stateless bu
 cd, export, unset, exit 같은 parent-state builtin은 단독 명령일 때 부모 프로세스에서 실행되어 shell 상태를 직접 바꾸고 exit는 REPL 종료 플래그를 남깁니다.
 multi-stage pipeline은 각 stage를 child에서 실행하며 pipe fd 체인과 command redirection을 함께 적용하고 마지막 명령의 status를 반환합니다.
 and/or list는 마지막으로 실행된 status를 기준으로 `&&`, `||` short-circuit 규칙을 적용해 필요한 pipeline만 실행합니다.
+sequence list는 `;` separator를 기준으로 앞 상태와 무관하게 좌에서 우로 and/or 단위를 순차 실행하고 마지막 status를 남깁니다.
 
 ## 프로젝트 목표
 
@@ -61,6 +62,7 @@ and/or list는 마지막으로 실행된 status를 기준으로 `&&`, `||` short
 - parent-state builtins
 - multi-stage pipeline execution
 - and/or short-circuit execution
+- semicolon-separated sequence execution
 - 토큰화, 파싱, 실행 흐름 구현
 
 ## 초기 디렉터리 구조

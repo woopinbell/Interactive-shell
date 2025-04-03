@@ -429,6 +429,13 @@ static int	sh_executor_run_and_or_list(t_shell *shell, t_and_or_list *list)
 	return (status);
 }
 
+static int	sh_executor_should_continue_sequence(
+		const t_sequence_list_node *node)
+{
+	return (node->next != NULL
+		&& node->next_separator == SH_SEQUENCE_SEPARATOR_SEMICOLON);
+}
+
 static int	sh_executor_run_sequence_list(t_shell *shell,
 		t_sequence_list *program)
 {
@@ -440,6 +447,8 @@ static int	sh_executor_run_sequence_list(t_shell *shell,
 	while (node != NULL)
 	{
 		status = sh_executor_run_and_or_list(shell, &node->and_or);
+		if (!sh_executor_should_continue_sequence(node))
+			break ;
 		node = node->next;
 	}
 	return (status);
