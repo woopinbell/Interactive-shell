@@ -74,7 +74,7 @@ static char	*sh_input_readline_read_line(void *context, const char *prompt)
 	readline_context->done = 0;
 	g_readline_context = readline_context;
 	rl_callback_handler_install(prompt, sh_input_readline_handle_line);
-	sh_signal_prompt_refresh();
+	sh_signal_input_refresh();
 	while (!readline_context->done)
 	{
 		FD_ZERO(&readfds);

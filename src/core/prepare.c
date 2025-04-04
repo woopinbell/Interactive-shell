@@ -1,6 +1,7 @@
 #include "shell/prepare.h"
 
 #include "shell/expand.h"
+#include "shell/signal.h"
 #include "shell/support/alloc.h"
 #include "shell/support/error.h"
 #include "shell/support/strbuf.h"
@@ -129,10 +130,19 @@ static int	sh_prepare_collect_heredoc(t_shell *shell,
 	}
 	previous_phase = shell->signal_phase;
 	shell->signal_phase = SH_SIGNAL_PHASE_HEREDOC;
+	sh_signal_heredoc_enter(shell);
 	while (1)
 	{
 		line = sh_input_adapter_read_line(&shell->input,
 				shell->is_interactive ? "heredoc> " : "");
+		if (sh_signal_heredoc_interrupted(shell))
+		{
+			sh_signal_heredoc_leave(shell);
+			shell->signal_phase = previous_phase;
+			free(line);
+			sh_prepare_heredoc_reset(&node->heredoc);
+			return (0);
+		}
 		if (line == NULL)
 			break ;
 		if (strcmp(line, node->heredoc.delimiter) == 0)
@@ -142,6 +152,7 @@ static int	sh_prepare_collect_heredoc(t_shell *shell,
 		}
 		if (!sh_prepare_collect_heredoc_line(shell, &node->heredoc, line))
 		{
+			sh_signal_heredoc_leave(shell);
 			shell->signal_phase = previous_phase;
 			shell->last_status = 1;
 			sh_perror("heredoc", "write");
@@ -149,6 +160,7 @@ static int	sh_prepare_collect_heredoc(t_shell *shell,
 			return (0);
 		}
 	}
+	sh_signal_heredoc_leave(shell);
 	if (lseek(node->heredoc.fd, 0, SEEK_SET) < 0)
 	{
 		shell->signal_phase = previous_phase;

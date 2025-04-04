@@ -9,7 +9,8 @@ typedef enum e_shell_signal_phase
 	SH_SIGNAL_PHASE_INIT,
 	SH_SIGNAL_PHASE_PROMPT,
 	SH_SIGNAL_PHASE_EXECUTE,
-	SH_SIGNAL_PHASE_HEREDOC
+	SH_SIGNAL_PHASE_HEREDOC,
+	SH_SIGNAL_PHASE_PIPELINE_WAIT
 }	t_shell_signal_phase;
 
 typedef struct s_shell

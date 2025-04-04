@@ -2,6 +2,7 @@
 #include "shell/exec.h"
 
 #include "shell/prepare.h"
+#include "shell/signal.h"
 #include "shell/support/alloc.h"
 #include "shell/support/error.h"
 
@@ -267,6 +268,20 @@ static int	sh_executor_wait_child(pid_t child_pid)
 	return (sh_executor_status_from_waitpid(wait_status));
 }
 
+static int	sh_executor_wait_child_with_signals(t_shell *shell, pid_t child_pid)
+{
+	t_shell_signal_phase	previous_phase;
+	int						status;
+
+	previous_phase = shell->signal_phase;
+	shell->signal_phase = SH_SIGNAL_PHASE_PIPELINE_WAIT;
+	sh_signal_wait_enter(shell);
+	status = sh_executor_wait_child(child_pid);
+	sh_signal_wait_leave(shell);
+	shell->signal_phase = previous_phase;
+	return (status);
+}
+
 static int	sh_executor_run_external_command(t_shell *shell,
 		t_simple_command *command, char **argv)
 {
@@ -281,8 +296,11 @@ static int	sh_executor_run_external_command(t_shell *shell,
 		return (status);
 	}
 	if (child_pid == 0)
+	{
+		sh_signal_child_default();
 		sh_executor_child_run_stage(shell, command, STDIN_FILENO, STDOUT_FILENO);
-	return (sh_executor_wait_child(child_pid));
+	}
+	return (sh_executor_wait_child_with_signals(shell, child_pid));
 }
 
 static int	sh_executor_run_simple_command(t_shell *shell,
@@ -325,6 +343,21 @@ static int	sh_executor_wait_pipeline_children(pid_t *pids, size_t count)
 	return (last_status);
 }
 
+static int	sh_executor_wait_pipeline_children_with_signals(t_shell *shell,
+		pid_t *pids, size_t count)
+{
+	t_shell_signal_phase	previous_phase;
+	int						status;
+
+	previous_phase = shell->signal_phase;
+	shell->signal_phase = SH_SIGNAL_PHASE_PIPELINE_WAIT;
+	sh_signal_wait_enter(shell);
+	status = sh_executor_wait_pipeline_children(pids, count);
+	sh_signal_wait_leave(shell);
+	shell->signal_phase = previous_phase;
+	return (status);
+}
+
 static pid_t	sh_executor_spawn_pipeline_stage(t_shell *shell,
 		t_simple_command *command, int input_fd, int output_fd)
 {
@@ -334,7 +367,10 @@ static pid_t	sh_executor_spawn_pipeline_stage(t_shell *shell,
 	if (child_pid < 0)
 		return (-1);
 	if (child_pid == 0)
+	{
+		sh_signal_child_default();
 		sh_executor_child_run_stage(shell, command, input_fd, output_fd);
+	}
 	return (child_pid);
 }
 
@@ -374,16 +410,17 @@ static int	sh_executor_run_pipeline_stages(t_shell *shell, t_pipeline *pipeline)
 	}
 	if (input_fd != STDIN_FILENO && node == NULL)
 		close(input_fd);
-	if (node != NULL)
+		if (node != NULL)
 	{
 		if (input_fd != STDIN_FILENO)
 			close(input_fd);
 		if (index > 0)
-			sh_executor_wait_pipeline_children(pids, index);
+			sh_executor_wait_pipeline_children_with_signals(shell, pids, index);
 		free(pids);
 		return (sh_executor_status_from_system_error(errno));
 	}
-	input_fd = sh_executor_wait_pipeline_children(pids, index);
+	input_fd = sh_executor_wait_pipeline_children_with_signals(shell,
+			pids, index);
 	free(pids);
 	return (input_fd);
 }
