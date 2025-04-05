@@ -37,6 +37,7 @@ multi-stage pipeline은 각 stage를 child에서 실행하며 pipe fd 체인과 
 and/or list는 마지막으로 실행된 status를 기준으로 `&&`, `||` short-circuit 규칙을 적용해 필요한 pipeline만 실행합니다.
 sequence list는 `;` separator를 기준으로 앞 상태와 무관하게 좌에서 우로 and/or 단위를 순차 실행하고 마지막 status를 남깁니다.
 signal disposition은 prompt 입력, heredoc 수집, child 실행, pipeline wait 단계별로 분리되어 interactive 시그널 처리가 서로 간섭하지 않도록 정리되었습니다.
+REPL 종료 규칙은 EOF와 exit builtin을 같은 종료 경로로 모으고, 빈 줄은 last status를 덮지 않으며 parent-state builtin이 남긴 상태와 종료 요청을 이후 실행 흐름에 일관되게 반영합니다.
 
 ## 프로젝트 목표
 
@@ -65,6 +66,7 @@ signal disposition은 prompt 입력, heredoc 수집, child 실행, pipeline wait
 - and/or short-circuit execution
 - semicolon-separated sequence execution
 - signal phase transitions
+- final shell exit and status behavior
 - 토큰화, 파싱, 실행 흐름 구현
 
 ## 초기 디렉터리 구조

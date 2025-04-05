@@ -451,6 +451,8 @@ static int	sh_executor_run_and_or_list(t_shell *shell, t_and_or_list *list)
 	if (list->head == NULL)
 		return (0);
 	status = sh_executor_run_pipeline(shell, &list->head->pipeline);
+	if (shell->should_exit)
+		return (status);
 	node = list->head;
 	while (node->next != NULL)
 	{
@@ -461,6 +463,8 @@ static int	sh_executor_run_and_or_list(t_shell *shell, t_and_or_list *list)
 			continue ;
 		}
 		status = sh_executor_run_pipeline(shell, &next->pipeline);
+		if (shell->should_exit)
+			return (status);
 		node = next;
 	}
 	return (status);
@@ -484,6 +488,8 @@ static int	sh_executor_run_sequence_list(t_shell *shell,
 	while (node != NULL)
 	{
 		status = sh_executor_run_and_or_list(shell, &node->and_or);
+		if (shell->should_exit)
+			break ;
 		if (!sh_executor_should_continue_sequence(node))
 			break ;
 		node = node->next;
@@ -519,6 +525,11 @@ int	sh_executor_run(t_shell *shell, t_sequence_list *program)
 
 	previous_phase = shell->signal_phase;
 	shell->signal_phase = SH_SIGNAL_PHASE_EXECUTE;
+	if (program->head == NULL)
+	{
+		shell->signal_phase = previous_phase;
+		return (shell->last_status);
+	}
 	if (!sh_prepare_sequence_words(shell, program))
 	{
 		shell->signal_phase = previous_phase;

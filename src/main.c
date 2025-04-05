@@ -74,7 +74,10 @@ static int	sh_main_repl(t_shell *shell)
 			continue ;
 		}
 		if (line == NULL)
+		{
+			shell->should_exit = 1;
 			break ;
+		}
 		if (shell->is_interactive && line[0] != '\0')
 			add_history(line);
 		sh_main_handle_line(shell, line);
