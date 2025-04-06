@@ -18,7 +18,7 @@ OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 DEPS := $(OBJS:.o=.d)
 HAS_ENTRYPOINT := $(strip $(wildcard $(ENTRYPOINT)))
 
-.PHONY: all objects layout clean fclean re run help
+.PHONY: all objects layout clean fclean re run test help
 
 # Allow `make` to succeed before the first translation unit exists.
 ifeq ($(strip $(SRCS)),)
@@ -60,7 +60,14 @@ else
 	@printf "no executable yet. add %s first.\n" "$(ENTRYPOINT)"
 endif
 
+test: all
+ifneq ($(HAS_ENTRYPOINT),)
+	@sh tests/integration/smoke.sh
+else
+	@printf "no executable yet. add %s first.\n" "$(ENTRYPOINT)"
+endif
+
 help:
-	@printf "available targets: all objects layout clean fclean re run help\n"
+	@printf "available targets: all objects layout clean fclean re run test help\n"
 
 -include $(DEPS)
