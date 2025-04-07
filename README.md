@@ -11,7 +11,31 @@ make clean  # 오브젝트 파일을 정리합니다.
 make fclean # build/ 디렉터리를 전체 정리합니다.
 make re     # 빌드 디렉터리를 다시 준비합니다.
 make run    # 최소 REPL을 실행합니다.
+make test   # 현재 구현 범위를 smoke test로 검증합니다.
 ```
+
+## 현재 지원 기능
+
+- interactive / non-interactive 입력 어댑터와 `readline` 프롬프트
+- `SIGINT`, `SIGQUIT` 처리와 phase별 signal disposition 분리
+- 공백 분리, quote 상태 추적, quoted/plain part 조립, `$VAR` / `$?` expansion
+- simple command, redirection, pipeline, `&&`, `||`, `;` 파싱과 실행
+- `<`, `>`, `>>`, heredoc redirection
+- PATH 탐색 기반 external command 실행과 envp 직렬화
+- `echo`, `pwd`, `env`, `true`, `false`, `cd`, `export`, `unset`, `exit` builtin
+- parent-state builtin의 부모 프로세스 실행과 REPL 종료 / status 갱신
+
+## 현재 제한 사항
+
+- subshell, parentheses, background job, job control은 아직 지원하지 않습니다.
+- wildcard expansion, command substitution, backslash escape 규칙은 아직 구현하지 않았습니다.
+- builtin 옵션과 POSIX edge case를 bash 수준으로 완전히 맞춘 상태는 아닙니다.
+- 자동화된 검증은 현재 integration smoke test 중심이며 unit test는 아직 없습니다.
+
+## 테스트
+
+`make test`는 현재 셸 바이너리를 빌드한 뒤 builtin, pipeline, and/or, sequence, redirection, heredoc, parent-state builtin, syntax error, exit status를 한 번에 확인합니다.
+마지막 릴리스 점검이나 회귀 확인은 [tests/integration/smoke.sh](/Users/woopinbell/Desktop/shell/tests/integration/smoke.sh:1) 기준으로 반복할 수 있습니다.
 
 현재는 `main`에서 셸 컨텍스트와 입력 어댑터를 묶는 최소 REPL 단계입니다.
 interactive 모드에서는 `readline`으로 프롬프트 입력을 받고, non-interactive 모드에서는 stdin 스트림을 같은 인터페이스로 읽으며 라인 단위 루프를 돕니다.
