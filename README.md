@@ -1,118 +1,141 @@
 # Interactive Shell
 
-Interactive Shell을 설계하고 구현하는 C 프로젝트입니다.
+> C로 구현한 POSIX 스타일 인터랙티브 셸입니다. 입력 어댑터, lexer/parser, expansion, heredoc, redirection, pipeline, builtin, signal phase를 분리해 작은 셸 런타임을 끝까지 연결했습니다.
 
-## 기본 빌드 뼈대
+![C](https://img.shields.io/badge/language-C-00599C?logo=c&logoColor=white)
+![Make](https://img.shields.io/badge/build-Make-427819)
+![Readline](https://img.shields.io/badge/input-GNU%20readline-4B5563)
+![POSIX](https://img.shields.io/badge/runtime-POSIX-0F766E)
+![Smoke Test](https://img.shields.io/badge/test-smoke%20suite-2563EB)
+
+## Demo
+
+![Interactive Shell demo](docs/assets/readme/interactive-shell-demo.gif)
+
+## 핵심 기능
+
+- Interactive / non-interactive 입력을 같은 adapter 인터페이스로 처리
+- `readline` 프롬프트, command history, EOF / `exit` 종료 흐름
+- quote 상태를 보존하는 lexer와 word part 조립
+- simple command, redirection, pipeline, `&&`, `||`, `;` precedence parser
+- `$VAR`, `$?` parameter expansion과 single quote expansion 차단
+- `<`, `>`, `>>`, `<<` redirection과 quoted heredoc delimiter 정책
+- PATH 탐색 기반 `execve` 실행, wait status를 shell exit status로 변환
+- `echo`, `pwd`, `env`, `true`, `false`, `cd`, `export`, `unset`, `exit` builtin
+- parent-state builtin은 단독 명령에서 부모 프로세스 상태를 직접 갱신
+- prompt, heredoc, child 실행, pipeline wait 단계별 signal disposition 분리
+- builtin, pipeline, redirection, heredoc, control flow를 검증하는 integration smoke test
+
+## 빠른 시작
+
+### 요구 사항
+
+- POSIX 호환 환경
+- C 컴파일러(`cc`)
+- `make`
+- GNU Readline 개발 라이브러리
+
+macOS에서 Readline 경로가 기본 linker 경로에 없다면 환경에 맞게 `CPPFLAGS`, `LDFLAGS`, `LDLIBS`를 함께 넘겨 빌드합니다.
 
 ```sh
-make        # 현재 구현된 셸 바이너리까지 빌드합니다.
-make objects # 현재 누적된 공통/코어 오브젝트만 빌드합니다.
-make clean  # 오브젝트 파일을 정리합니다.
-make fclean # build/ 디렉터리를 전체 정리합니다.
-make re     # 빌드 디렉터리를 다시 준비합니다.
-make run    # 최소 REPL을 실행합니다.
-make test   # 현재 구현 범위를 smoke test로 검증합니다.
+make
+make run
 ```
 
-## 현재 지원 기능
+Non-interactive 모드는 stdin을 통해 바로 확인할 수 있습니다.
 
-- interactive / non-interactive 입력 어댑터와 `readline` 프롬프트
-- `SIGINT`, `SIGQUIT` 처리와 phase별 signal disposition 분리
-- 공백 분리, quote 상태 추적, quoted/plain part 조립, `$VAR` / `$?` expansion
-- simple command, redirection, pipeline, `&&`, `||`, `;` 파싱과 실행
-- `<`, `>`, `>>`, heredoc redirection
-- PATH 탐색 기반 external command 실행과 envp 직렬화
-- `echo`, `pwd`, `env`, `true`, `false`, `cd`, `export`, `unset`, `exit` builtin
-- parent-state builtin의 부모 프로세스 실행과 REPL 종료 / status 갱신
+```sh
+printf 'echo hello | tr h H\n' | ./build/bin/shell
+```
 
-## 현재 제한 사항
+테스트는 현재 구현 범위를 smoke suite로 검증합니다.
 
-- subshell, parentheses, background job, job control은 아직 지원하지 않습니다.
-- wildcard expansion, command substitution, backslash escape 규칙은 아직 구현하지 않았습니다.
-- builtin 옵션과 POSIX edge case를 bash 수준으로 완전히 맞춘 상태는 아닙니다.
-- 자동화된 검증은 현재 integration smoke test 중심이며 unit test는 아직 없습니다.
+```sh
+make test
+```
 
-## 테스트
+주요 Make target은 다음과 같습니다.
 
-`make test`는 현재 셸 바이너리를 빌드한 뒤 builtin, pipeline, and/or, sequence, redirection, heredoc, parent-state builtin, syntax error, exit status를 한 번에 확인합니다.
-마지막 릴리스 점검이나 회귀 확인은 [tests/integration/smoke.sh](/Users/woopinbell/Desktop/shell/tests/integration/smoke.sh:1) 기준으로 반복할 수 있습니다.
+| Target | 설명 |
+| --- | --- |
+| `make` | `build/bin/shell` 빌드 |
+| `make objects` | source object만 컴파일 |
+| `make run` | interactive REPL 실행 |
+| `make test` | integration smoke test 실행 |
+| `make clean` | object 정리 |
+| `make fclean` | `build/` 전체 정리 |
+| `make re` | clean build |
 
-현재는 `main`에서 셸 컨텍스트와 입력 어댑터를 묶는 최소 REPL 단계입니다.
-interactive 모드에서는 `readline`으로 프롬프트 입력을 받고, non-interactive 모드에서는 stdin 스트림을 같은 인터페이스로 읽으며 라인 단위 루프를 돕니다.
-프롬프트 대기 중 `SIGINT`는 현재 입력을 취소하고 새 프롬프트로 돌아가며 `SIGQUIT`은 무시합니다.
-파싱 단계로 넘어가기 전에 lexer가 공통으로 사용할 토큰 kind와 quote 상태 타입을 먼저 고정합니다.
-현재 lexer는 공백 분리, `&&`, `||`, `;`, `|`, `<`, `>`, `<<`, `>>` 연산자 토큰화와 일반 단어 수집까지 지원합니다.
-quoted/plain 인접 조각은 하나의 logical word로 조립되고 각 part는 plain, single, double 상태를 따로 보존합니다.
-`$VAR`, `$?`, parameter 식별자 스캔과 lookup helper도 분리해 다음 확장 단계의 기반을 준비합니다.
-simple command, argv word, redirection, heredoc placeholder를 담는 AST 타입도 parse 계층에 먼저 고정합니다.
-simple command 위에는 pipeline, and/or list, sequence list 계층을 쌓아 `&&`, `||`, `;`를 담는 상위 AST 구조를 준비합니다.
-parser는 먼저 word/redirection을 simple command로 모으고 `>`, `|`, `&&` 뒤 누락 같은 기본 syntax error를 감지합니다.
-이후 parser는 simple command -> pipeline -> and/or -> sequence 순서로 연산자 우선순위를 반영해 상위 AST를 조립합니다.
-heredoc redirection은 delimiter 문자열과 quoted delimiter 규칙에 따른 확장 허용 여부를 AST에 함께 기록합니다.
-parsed word의 expansion은 lexing이 아니라 실행 전 word preparation 단계에서 수행하며 single quote part는 확장을 막습니다.
-실행 전 준비 단계는 heredoc 본문도 미리 수집하고 quoted delimiter 여부에 따라 body expansion을 켜거나 끕니다.
-executor는 AST를 받아 preparation을 거쳐 실행하는 공용 entrypoint를 제공하고 waitpid/system error를 shell status 규칙으로 변환합니다.
-실행 파일 해석은 절대/상대 경로와 PATH 탐색을 분리해 후보를 찾고 이후 exec 단계가 그 결과를 재사용합니다.
-simple external command는 fork, execve, wait 흐름으로 실행되고 child envp는 env store 직렬화를 사용합니다.
-builtin registry가 추가되어 echo, pwd, env, true, false 같은 stateless builtin은 parent에서 바로 실행됩니다.
-단일 명령 실행 경로는 <, >, >>, prepared heredoc redirection을 적용하고 standalone builtin 쪽은 fd save/restore로 원래 표준 입출력을 되돌립니다.
-cd, export, unset, exit 같은 parent-state builtin은 단독 명령일 때 부모 프로세스에서 실행되어 shell 상태를 직접 바꾸고 exit는 REPL 종료 플래그를 남깁니다.
-multi-stage pipeline은 각 stage를 child에서 실행하며 pipe fd 체인과 command redirection을 함께 적용하고 마지막 명령의 status를 반환합니다.
-and/or list는 마지막으로 실행된 status를 기준으로 `&&`, `||` short-circuit 규칙을 적용해 필요한 pipeline만 실행합니다.
-sequence list는 `;` separator를 기준으로 앞 상태와 무관하게 좌에서 우로 and/or 단위를 순차 실행하고 마지막 status를 남깁니다.
-signal disposition은 prompt 입력, heredoc 수집, child 실행, pipeline wait 단계별로 분리되어 interactive 시그널 처리가 서로 간섭하지 않도록 정리되었습니다.
-REPL 종료 규칙은 EOF와 exit builtin을 같은 종료 경로로 모으고, 빈 줄은 last status를 덮지 않으며 parent-state builtin이 남긴 상태와 종료 요청을 이후 실행 흐름에 일관되게 반영합니다.
+## 아키텍처
 
-## 프로젝트 목표
+```mermaid
+flowchart TD
+    A["stdin / readline"] --> B["input adapter"]
+    B --> C["lexer<br/>token + quote part"]
+    C --> D["parser<br/>sequence / and-or / pipeline / command"]
+    D --> E["prepare<br/>word expansion + heredoc collection"]
+    E --> F["executor"]
+    F --> G["builtin registry"]
+    F --> H["fork / execve / waitpid"]
+    G --> I["env store + shell status"]
+    H --> I
+    I --> B
 
-- 기본 빌드 환경 구성
-- 최소 유틸리티와 자려구조 준비
-- 입력 루프와 상태 관리 추가
-- interactive / non-interactive 입력 어댑터 연결
-- 토큰 종류와 quote 상태 타입 정의
-- 셸 연산자와 일반 단어 lexer 구현
-- quoted 인접 word part 조립
-- parameter expansion helper 분리
-- command/redirection AST 타입 정의
-- pipeline/and-or/sequence AST 타입 정의
-- simple command 파싱과 기본 syntax error 처리
-- pipeline/and-or/sequence precedence 파싱
-- heredoc delimiter metadata 기록
-- parsed word preparation expansion
-- heredoc input collection and expansion policy
-- executor entrypoint and shell status mapping
-- executable path resolution
-- simple external command execution
-- builtin dispatch and stateless builtins
-- single command redirection apply
-- parent-state builtins
-- multi-stage pipeline execution
-- and/or short-circuit execution
-- semicolon-separated sequence execution
-- signal phase transitions
-- final shell exit and status behavior
-- 토큰화, 파싱, 실행 흐름 구현
+    S["signal phase"] -. prompt / heredoc / execute / wait .-> B
+    S -. child defaults .-> H
+```
 
-## 초기 디렉터리 구조
+### 디렉터리 구조
 
 ```text
-include/shell/support/ 공통 메모리/버퍼/vector/검증 helper 헤더
-include/shell/         나머지 공개 헤더
-src/support/       메모리 할당, 버퍼, vector, 검증 같은 공통 유틸리티
-src/core/          REPL, 셸 컨텍스트, 환경 저장소
-src/parse/         토큰화와 파싱
-src/exec/          실행기와 리디렉션
-src/builtin/       내장 명령어
-tests/unit/        단위 테스트
-tests/integration/ 통합 테스트
-build/             Make가 생성하는 빌드 산출물
+include/shell/          public module contracts
+include/shell/support/  allocation, string buffer, vector, identifier, path helpers
+src/core/               shell context, input adapter, env store, expansion, prepare, signal
+src/parse/              lexer, AST, parser
+src/exec/               executor, path resolution, redirection and pipeline runtime
+src/builtin/            builtin registry and implementations
+tests/integration/      end-to-end smoke tests
+docs/assets/readme/     README demo assets
 ```
 
-## 예정 범위
+## 기술적 결정
 
-- REPL 기반 명령 입력
-- 환경 변수와 종료 코드 추적
-- 다중 파이프와 리디렉션 지원
-- heredoc
-- 대표적인 내장 명령어 구현
-- &&, ||, ; 연산자 지원
+- Lexer에서 quote 정보를 버리지 않고 word part로 보존했습니다. 덕분에 parser 이후 prepare 단계에서 single quote만 expansion을 차단할 수 있습니다.
+- AST를 `simple command -> pipeline -> and/or -> sequence`로 나누어 shell operator precedence를 자료구조 자체에 반영했습니다.
+- Expansion과 heredoc 수집은 실행 직전 prepare 단계로 모았습니다. Parsing은 구조만 만들고, runtime 상태가 필요한 `$?`와 env lookup은 shell context를 가진 단계에서 처리합니다.
+- `cd`, `export`, `unset`, `exit`처럼 부모 상태를 바꾸는 builtin은 단독 명령일 때 parent에서 실행합니다. Pipeline stage에서는 child에서 실행되어 일반 셸의 상태 격리와 맞춥니다.
+- Redirection을 builtin에도 동일하게 적용하기 위해 parent 실행 경로에서는 stdin/stdout을 저장하고 실행 후 복구합니다.
+- Signal 처리는 prompt, heredoc, execute, pipeline wait phase로 분리했습니다. 입력 중 `SIGINT`는 현재 입력을 취소하고, child 실행 중에는 child가 기본 signal 동작을 갖도록 둡니다.
+- Smoke test는 구현 범위의 사용자 관찰 동작을 중심으로 구성했습니다. 내부 함수 단위보다 REPL 입력 한 줄이 만드는 전체 실행 결과를 우선 검증합니다.
+
+## 검증 범위
+
+`tests/integration/smoke.sh`는 다음 흐름을 확인합니다.
+
+- `echo`, `cd`, `export`, `exit` 등 builtin 동작
+- quote별 expansion 차이
+- pipeline 실행과 마지막 stage status
+- `&&`, `||`, `;` control flow
+- file redirection과 heredoc expansion
+- blank line status 유지
+- syntax error status와 stderr 메시지
+
+## 제한 사항
+
+- Subshell, parentheses, background job, job control은 지원하지 않습니다.
+- Wildcard expansion, command substitution, arithmetic expansion은 아직 없습니다.
+- Backslash escape와 word splitting은 bash 호환 수준으로 확장되어 있지 않습니다.
+- Builtin 옵션과 POSIX edge case는 smoke test 범위 중심으로 구현되어 있습니다.
+- 자동화 테스트는 integration smoke test 위주이며, module-level unit test는 아직 비어 있습니다.
+
+## 다음 단계
+
+- Lexer/expansion edge case unit test 추가
+- `*` wildcard expansion과 더 정교한 quote/escape 규칙 도입
+- `PATH`, executable permission, directory execution error 메시지 정밀화
+- Pipeline 실패 경로의 fd cleanup 회귀 테스트 보강
+- POSIX shell behavior matrix를 문서화해 bash와 의도적으로 다른 지점 표시
+
+## 튜토리얼 북
+
+구현 과정을 커밋 순서로 읽는 학습용 문서는 [book 브랜치](https://github.com/woopinbell/interactive-shell/tree/book/book)에 정리되어 있습니다. 이 README는 결과물 중심의 포트폴리오 문서이고, book 브랜치는 설계가 누적되는 과정을 장별 튜토리얼로 설명합니다.
