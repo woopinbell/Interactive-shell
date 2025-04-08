@@ -10,6 +10,8 @@
 
 ## Demo
 
+실제 `build/bin/shell` 세션에서 pipeline, redirection, heredoc expansion, `cd` parent-state builtin을 순서대로 실행한 녹화입니다.
+
 ![Interactive Shell demo](docs/assets/readme/interactive-shell-demo.gif)
 
 ## 핵심 기능
