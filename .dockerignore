@@ -1,0 +1,9 @@
+.git
+build
+book
+presentation
+dev
+*.o
+*.d
+*.log
+.DS_Store

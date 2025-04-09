@@ -12,13 +12,20 @@ BIN_DIR := $(BUILD_DIR)/bin
 OBJ_DIR := $(BUILD_DIR)/obj
 TARGET := $(BIN_DIR)/$(PROJECT)
 ENTRYPOINT := $(SRC_DIR)/main.c
+DOCKER_COMPOSE ?= docker compose
+DOCKER_SERVICE ?= shell
+DOCKER_BUILD_DIR ?= build/docker
+DOCKER_MAKE_ARGS ?= BUILD_DIR=$(DOCKER_BUILD_DIR)
+HOST_UID ?= $(shell id -u)
+HOST_GID ?= $(shell id -g)
+DOCKER_ENV := HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID)
 
 SRCS := $(sort $(shell find $(SRC_DIR) -type f -name '*.c' 2>/dev/null))
 OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 DEPS := $(OBJS:.o=.d)
 HAS_ENTRYPOINT := $(strip $(wildcard $(ENTRYPOINT)))
 
-.PHONY: all objects layout clean fclean re run test help
+.PHONY: all objects layout clean fclean re run test smoke docker-build docker-run up down logs ps help
 
 # Allow `make` to succeed before the first translation unit exists.
 ifeq ($(strip $(SRCS)),)
@@ -62,12 +69,38 @@ endif
 
 test: all
 ifneq ($(HAS_ENTRYPOINT),)
-	@sh tests/integration/smoke.sh
+	@SHELL_BIN="$(CURDIR)/$(TARGET)" sh tests/integration/smoke.sh
 else
 	@printf "no executable yet. add %s first.\n" "$(ENTRYPOINT)"
 endif
 
+docker-build:
+	$(DOCKER_ENV) $(DOCKER_COMPOSE) build $(DOCKER_SERVICE)
+
+smoke: docker-build
+ifneq ($(HAS_ENTRYPOINT),)
+	$(DOCKER_ENV) $(DOCKER_COMPOSE) run --rm -T $(DOCKER_SERVICE) make $(DOCKER_MAKE_ARGS) test
+else
+	@printf "no executable yet. add %s first.\n" "$(ENTRYPOINT)"
+endif
+
+docker-run up: docker-build
+ifneq ($(HAS_ENTRYPOINT),)
+	$(DOCKER_ENV) $(DOCKER_COMPOSE) run --rm $(DOCKER_SERVICE)
+else
+	@printf "no executable yet. add %s first.\n" "$(ENTRYPOINT)"
+endif
+
+down:
+	$(DOCKER_ENV) $(DOCKER_COMPOSE) down --remove-orphans
+
+logs:
+	$(DOCKER_ENV) $(DOCKER_COMPOSE) logs $(DOCKER_SERVICE)
+
+ps:
+	$(DOCKER_ENV) $(DOCKER_COMPOSE) ps
+
 help:
-	@printf "available targets: all objects layout clean fclean re run test help\n"
+	@printf "available targets: all objects layout clean fclean re run test smoke docker-build docker-run up down logs ps help\n"
 
 -include $(DEPS)

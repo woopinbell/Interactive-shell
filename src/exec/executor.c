@@ -410,7 +410,7 @@ static int	sh_executor_run_pipeline_stages(t_shell *shell, t_pipeline *pipeline)
 	}
 	if (input_fd != STDIN_FILENO && node == NULL)
 		close(input_fd);
-		if (node != NULL)
+	if (node != NULL)
 	{
 		if (input_fd != STDIN_FILENO)
 			close(input_fd);

@@ -3,7 +3,7 @@
 set -u
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
-SHELL_BIN="$ROOT_DIR/build/bin/shell"
+SHELL_BIN=${SHELL_BIN:-"$ROOT_DIR/build/bin/shell"}
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/shell-smoke.XXXXXX") || exit 1
 FAILURES=0
 CASE_INDEX=0

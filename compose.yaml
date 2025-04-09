@@ -1,0 +1,13 @@
+services:
+  shell:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: interactive-shell:dev
+    working_dir: /workspace
+    command: ["make", "BUILD_DIR=build/docker", "run"]
+    stdin_open: true
+    tty: true
+    user: "${HOST_UID:-0}:${HOST_GID:-0}"
+    volumes:
+      - .:/workspace
