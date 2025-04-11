@@ -24,7 +24,7 @@
 - `<`, `>`, `>>`, `<<` redirection과 quoted heredoc delimiter 정책
 - PATH 탐색 기반 `execve` 실행, wait status를 shell exit status로 변환
 - `echo`, `pwd`, `env`, `true`, `false`, `cd`, `export`, `unset`, `exit` builtin
-- parent-state builtin은 단독 명령에서 부모 프로세스 상태를 직접 갱신
+- 단독 builtin은 부모 프로세스에서 실행되어 `cd`, `export`, `unset`, `exit`의 상태 변경을 반영
 - prompt, heredoc, child 실행, pipeline wait 단계별 signal disposition 분리
 - builtin, pipeline, redirection, heredoc, control flow를 검증하는 integration smoke test
 
@@ -56,17 +56,38 @@ printf 'echo hello | tr h H\n' | ./build/bin/shell
 make test
 ```
 
+Docker가 있는 환경에서는 로컬 GNU Readline 개발 라이브러리 설치 없이 같은 smoke suite를 컨테이너에서 실행할 수 있습니다.
+
+```sh
+make smoke
+```
+
+인터랙티브 런타임도 한 줄로 실행합니다.
+
+```sh
+make docker-run
+```
+
+위 target은 내부적으로 `docker compose run --rm shell`을 사용하며, 컨테이너 빌드 산출물은 `build/docker/` 아래에 분리합니다.
+
 주요 Make target은 다음과 같습니다.
 
 | Target | 설명 |
 | --- | --- |
 | `make` | `build/bin/shell` 빌드 |
 | `make objects` | source object만 컴파일 |
+| `make layout` | `build/bin/`, `build/obj/` 디렉터리 생성 |
 | `make run` | interactive REPL 실행 |
 | `make test` | integration smoke test 실행 |
+| `make smoke` | Docker 컨테이너에서 integration smoke test 실행 |
+| `make docker-run` / `make up` | Docker 컨테이너에서 interactive REPL 실행 |
+| `make down` | Docker Compose 리소스 정리 |
+| `make logs` | Docker Compose 로그 확인 |
+| `make ps` | Docker Compose 서비스 상태 확인 |
 | `make clean` | object 정리 |
 | `make fclean` | `build/` 전체 정리 |
 | `make re` | clean build |
+| `make help` | 사용 가능한 target 출력 |
 
 ## 아키텍처
 
@@ -97,6 +118,7 @@ src/parse/              lexer, AST, parser
 src/exec/               executor, path resolution, redirection and pipeline runtime
 src/builtin/            builtin registry and implementations
 tests/integration/      end-to-end smoke tests
+tests/unit/             unit test placeholder
 docs/assets/readme/     README demo assets
 ```
 
@@ -105,7 +127,7 @@ docs/assets/readme/     README demo assets
 - Lexer에서 quote 정보를 버리지 않고 word part로 보존했습니다. 덕분에 parser 이후 prepare 단계에서 single quote만 expansion을 차단할 수 있습니다.
 - AST를 `simple command -> pipeline -> and/or -> sequence`로 나누어 shell operator precedence를 자료구조 자체에 반영했습니다.
 - Expansion과 heredoc 수집은 실행 직전 prepare 단계로 모았습니다. Parsing은 구조만 만들고, runtime 상태가 필요한 `$?`와 env lookup은 shell context를 가진 단계에서 처리합니다.
-- `cd`, `export`, `unset`, `exit`처럼 부모 상태를 바꾸는 builtin은 단독 명령일 때 parent에서 실행합니다. Pipeline stage에서는 child에서 실행되어 일반 셸의 상태 격리와 맞춥니다.
+- 단독 builtin은 parent에서 실행합니다. 이 경로 덕분에 `cd`, `export`, `unset`, `exit`처럼 부모 상태를 바꾸는 builtin이 현재 셸 상태에 반영됩니다. Pipeline stage에서는 child에서 실행되어 일반 셸의 상태 격리와 맞춥니다.
 - Redirection을 builtin에도 동일하게 적용하기 위해 parent 실행 경로에서는 stdin/stdout을 저장하고 실행 후 복구합니다.
 - Signal 처리는 prompt, heredoc, execute, pipeline wait phase로 분리했습니다. 입력 중 `SIGINT`는 현재 입력을 취소하고, child 실행 중에는 child가 기본 signal 동작을 갖도록 둡니다.
 - Smoke test는 구현 범위의 사용자 관찰 동작을 중심으로 구성했습니다. 내부 함수 단위보다 REPL 입력 한 줄이 만드는 전체 실행 결과를 우선 검증합니다.
@@ -137,7 +159,3 @@ docs/assets/readme/     README demo assets
 - `PATH`, executable permission, directory execution error 메시지 정밀화
 - Pipeline 실패 경로의 fd cleanup 회귀 테스트 보강
 - POSIX shell behavior matrix를 문서화해 bash와 의도적으로 다른 지점 표시
-
-## 튜토리얼 북
-
-구현 과정을 커밋 순서로 읽는 학습용 문서는 [book 브랜치](https://github.com/woopinbell/interactive-shell/tree/book/book)에 정리되어 있습니다. 이 README는 결과물 중심의 포트폴리오 문서이고, book 브랜치는 설계가 누적되는 과정을 장별 튜토리얼로 설명합니다.
